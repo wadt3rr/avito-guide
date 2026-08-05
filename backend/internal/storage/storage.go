@@ -1,5 +1,18 @@
 package storage
 
-import "errors"
+import (
+	"context"
+	"errors"
+
+	"github.com/google/uuid"
+	"github.com/wadt3rr/avito-guide/backend/internal/models"
+)
 
 var ErrNotFound = errors.New("not found")
+
+type ScenarioStorage interface {
+	CreateScenario(ctx context.Context, scenario *models.Scenario) (uuid.UUID, error)
+	GetScenarios(ctx context.Context) ([]models.Scenario, error)
+	GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Scenario, error)
+	UpdateScenario(ctx context.Context, id uuid.UUID, req models.UpdateScenarioReq) error
+}
