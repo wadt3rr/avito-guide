@@ -193,11 +193,8 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "invalid scenario id", http.StatusBadRequest)
 				return
 			}
-			session_id, err := uuid.Parse(chi.URLParam(req, "session_id"))
-			if err != nil {
-				http.Error(w, "invalid session id", http.StatusBadRequest)
-				return
-			}
+
+			session_id := chi.URLParam(req, "session_id")
 
 			progress, err := store.GetProgress(req.Context(), id, session_id)
 			if err != nil {
@@ -220,7 +217,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
 			}
-			err := store.UpsertProgress(req.Context(), id, updateReq)
+			progress, err := store.UpsertProgress(req.Context(), id, updateReq)
 			if err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
 					http.Error(w, "scenario not found", http.StatusNotFound)
@@ -230,17 +227,59 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "failed to update scenario", http.StatusInternalServerError)
 				return
 			}
-			progress, err := store.GetProgress(req.Context(), id, updateReq.SessionID)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "progress not found", http.StatusNotFound)
-					return
-				}
-				log.Error("failed to fetch updated progress for scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to fetch updated progress for scenario", http.StatusInternalServerError)
+			writeJSON(w, http.StatusOK, progress)
+		})
+
+		r.Post("/analytics/events", func(w http.ResponseWriter, req *http.Request) {
+			var CreateEventReq models.CreateEventReq
+			if err := json.NewDecoder(req.Body).Decode(&CreateEventReq); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
 			}
-			writeJSON(w, http.StatusOK, progress)
+			if CreateEventReq.SessionID == "" {
+				http.Error(w, "session_id is required", http.StatusBadRequest)
+				return
+			}
+			if CreateEventReq.ScenarioID == uuid.Nil {
+				http.Error(w, "scenario_id is required", http.StatusBadRequest)
+				return
+			}
+			if CreateEventReq.EventType == "" {
+				http.Error(w, "event_type is required", http.StatusBadRequest)
+				return
+			}
+
+			switch CreateEventReq.EventType {
+			case models.EventStarted, models.EventFinished, models.EventSkipped, models.EventStepCompleted:
+			default:
+				http.Error(w, "invalid event type", http.StatusBadRequest)
+				return
+			}
+
+			if err := store.CreateAnalyticsEvent(req.Context(), CreateEventReq); err != nil {
+				log.Error("failed to create analytics event", slog.String("error", err.Error()))
+				http.Error(w, "failed to create analytics event", http.StatusInternalServerError)
+				return
+			}
+
+			writeJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
+		})
+
+		r.Get("/scenarios/{id}/analytics", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+			analytics, err := store.GetScenarioAnalytics(req.Context(), id)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "scenario not found", http.StatusNotFound)
+					log.Error("failed to get analytics scenario", slog.String("error", err.Error()))
+					return
+				}
+			}
+			writeJSON(w, http.StatusOK, analytics)
 		})
 	})
 

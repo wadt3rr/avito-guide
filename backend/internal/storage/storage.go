@@ -17,4 +17,6 @@ type ScenarioStorage interface {
 	UpdateScenario(ctx context.Context, id uuid.UUID, req models.UpdateScenarioReq) error
 	GetProgress(ctx context.Context, scenarioID uuid.UUID, sessionID string) (*models.Progress, error)
 	UpsertProgress(ctx context.Context, scenarioID uuid.UUID, req models.UpsertProgressReq) (*models.Progress, error)
+	GetScenarioAnalytics(ctx context.Context, scenarioID uuid.UUID) (*models.ScenarioAnalytics, error)
+	CreateAnalyticsEvent(ctx context.Context, req models.CreateEventReq) error
 }

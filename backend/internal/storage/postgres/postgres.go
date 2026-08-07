@@ -471,3 +471,80 @@ func (s *Storage) UpsertProgress(ctx context.Context, scenarioID uuid.UUID, req 
 
 	return &p, nil
 }
+
+func (s *Storage) CreateAnalyticsEvent(ctx context.Context, req models.CreateEventReq) error {
+	const op = "postgres.Storage.CreateAnalyticEvent"
+
+	if req.SessionID == "" {
+		return fmt.Errorf("%s: session_id is required", op)
+	}
+
+	if req.EventType == "" {
+		return fmt.Errorf("%s: event_type is required", op)
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("%s: failed to generate id: %w", op, err)
+	}
+
+	_, err = s.pool.Exec(
+		ctx,
+		`INSERT INTO analytics_events (id, scenario_id, session_id, step_id,event_type, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, req.ScenarioID, req.SessionID, req.StepID, req.EventType, time.Now().UTC(),
+	)
+
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return nil
+}
+
+func (s *Storage) GetScenarioAnalytics(ctx context.Context, scenarioID uuid.UUID) (*models.ScenarioAnalytics, error) {
+	const op = "postgres.Storage.GetScenarioAnalytics"
+	var a models.ScenarioAnalytics
+	a.ScenarioID = scenarioID
+
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT 
+				COUNT(DISTINCT session_id) FILTER ( WHERE event_type = 'started'),
+				COUNT(DISTINCT session_id) FILTER ( WHERE event_type = 'finished'),
+				COUNT(DISTINCT session_id) FILTER ( WHERE event_type = 'skipped')
+			FROM analytics_events WHERE scenario_id = $1`, scenarioID).Scan(&a.Started, &a.Finished, &a.Skipped)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	if a.Started > 0 {
+		a.Conversion = float64(a.Finished) / float64(a.Started) * 100
+	}
+
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT 
+    		s.id, s.step_order, s.title, 
+    		COUNT(DISTINCT ae.session_id) FILTER (WHERE ae.event_type = 'step_completed') AS completed
+		FROM steps AS s
+		LEFT JOIN analytics_events AS ae
+		    ON ae.step_id = s.id AND ae.scenario_id = s.scenario_id
+		WHERE s.scenario_id = $1 
+		GROUP BY s.id, s.step_order, s.title 
+		ORDER BY s.step_order`,
+		scenarioID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var st models.StepStats
+		if err = rows.Scan(&st.StepID, &st.StepOrder, &st.Title, &st.Completed); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		a.Steps = append(a.Steps, st)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &a, nil
+}
