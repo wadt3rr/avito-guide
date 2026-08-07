@@ -1,7 +1,50 @@
 services:
-  # Демо-сайт классифайда — сцена, на которой проверяется онбординг.
-  # Папка проекта монтируется с хоста: правки подхватываются на лету,
-  # а node_modules оказываются на диске, чтобы редактор видел типы.
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: avito
+      POSTGRES_PASSWORD: avito
+      POSTGRES_DB: avito
+    ports:
+      - '5433:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U avito -d avito']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_ENV: local
+      STORAGE_DSN: postgres://avito:avito@db:5432/avito?sslmode=disable
+      MIGRATIONS_PATH: /app/migrations
+      HTTP_ADDRESS: 0.0.0.0:8081
+      CORS_ALLOWED_ORIGINS: '*'
+    ports:
+      - '8081:8081'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:8081/api/v1/scenarios >/dev/null || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  seed:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts:ro
+    entrypoint: ['sh', '/scripts/seed-demo.sh']
+    restart: 'no'
+
   demo:
     build:
       context: ./frontend/demo
@@ -10,9 +53,6 @@ services:
     volumes:
       - ./frontend/demo:/app
 
-  # Виджет собирается в один файл и раздаётся с отдельного адреса —
-  # так же, как он раздавался бы с CDN. Демо-сайт подключает его
-  # с другого порта, то есть кросс-доменно, как настоящий сторонний сайт.
   widget:
     build:
       context: ./frontend/widget
@@ -20,3 +60,6 @@ services:
       - '8082:8082'
     volumes:
       - ./frontend/widget:/app
+
+volumes:
+  db-data:
