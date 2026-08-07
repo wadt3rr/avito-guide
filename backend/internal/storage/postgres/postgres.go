@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -145,7 +146,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, title, description, status, created_at, updated_at
+		`SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         ORDER BY created_at DESC`,
 	)
@@ -154,21 +155,28 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 	}
 	defer rows.Close()
 
-	// Пустой срез, а не nil: иначе пустой список уедет клиенту как null вместо [].
 	scenarios := make([]models.Scenario, 0)
 
 	for rows.Next() {
 		var sc models.Scenario
+		var rawMatch []byte
 		err = rows.Scan(
 			&sc.ID,
 			&sc.Title,
 			&sc.Description,
 			&sc.Status,
+			&sc.PublishedAt,
+			&sc.URLPattern,
+			&rawMatch,
+			&sc.Priority,
 			&sc.CreatedAt,
 			&sc.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("%s: scannig error: %w", op, err)
+		}
+		if err = json.Unmarshal(rawMatch, &sc.MatchContext); err != nil {
+			return nil, fmt.Errorf("%s: unmarshal match_context: %w", op, err)
 		}
 		scenarios = append(scenarios, sc)
 	}
@@ -193,9 +201,10 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 	}()
 
 	var sc models.Scenario
+	var rawMatch []byte
 
 	err = tx.QueryRow(ctx, `
-        SELECT id, title, description, status, created_at, updated_at
+        SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         WHERE id = $1
     `, id).Scan(
@@ -203,6 +212,10 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 		&sc.Title,
 		&sc.Description,
 		&sc.Status,
+		&sc.PublishedAt,
+		&sc.URLPattern,
+		&rawMatch,
+		&sc.Priority,
 		&sc.CreatedAt,
 		&sc.UpdatedAt,
 	)
@@ -211,6 +224,10 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 			return nil, storage.ErrNotFound
 		}
 		return nil, fmt.Errorf("%s: failed to query scenario: %w", op, err)
+	}
+
+	if err = json.Unmarshal(rawMatch, &sc.MatchContext); err != nil {
+		return nil, fmt.Errorf("%s: unmarshal match_context: %w", op, err)
 	}
 
 	rows, err := tx.Query(ctx, `
@@ -287,6 +304,35 @@ func (s *Storage) UpdateScenario(ctx context.Context, id uuid.UUID, req models.U
 	if req.Status != nil {
 		query += fmt.Sprintf(", status = $%d", argPos)
 		args = append(args, *req.Status)
+		argPos++
+	}
+	if req.Published != nil {
+		if *req.Published {
+			query += fmt.Sprintf(", published_at = COALESCE(published_at, $%d)", argPos)
+			args = append(args, time.Now().UTC())
+		} else {
+			query += fmt.Sprintf(", published_at = $%d", argPos)
+			args = append(args, nil)
+		}
+		argPos++
+	}
+	if req.URLPattern != nil {
+		query += fmt.Sprintf(", url_pattern = $%d", argPos)
+		args = append(args, *req.URLPattern)
+		argPos++
+	}
+	if req.MatchContext != nil {
+		raw, err := json.Marshal(*req.MatchContext)
+		if err != nil {
+			return fmt.Errorf("%s: marshal match_context: %w", op, err)
+		}
+		query += fmt.Sprintf(", match_context = $%d::jsonb", argPos)
+		args = append(args, string(raw))
+		argPos++
+	}
+	if req.Priority != nil {
+		query += fmt.Sprintf(", priority = $%d", argPos)
+		args = append(args, *req.Priority)
 		argPos++
 	}
 

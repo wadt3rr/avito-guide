@@ -252,9 +252,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				return
 			}
 
-			switch CreateEventReq.EventType {
-			case models.EventStarted, models.EventFinished, models.EventSkipped, models.EventStepCompleted:
-			default:
+			if !CreateEventReq.EventType.Valid() {
 				http.Error(w, "invalid event type", http.StatusBadRequest)
 				return
 			}
@@ -283,6 +281,81 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				}
 			}
 			writeJSON(w, http.StatusOK, analytics)
+		})
+
+		r.Route("/embed", func(r chi.Router) {
+			r.Post("/resolve", func(w http.ResponseWriter, req *http.Request) {
+				var resolveReq models.ResolveRequest
+				if err := json.NewDecoder(req.Body).Decode(&resolveReq); err != nil {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
+				}
+
+				if strings.TrimSpace(resolveReq.URL) == "" {
+					http.Error(w, "url is required", http.StatusBadRequest)
+					return
+				}
+
+				scenario, err := store.ResolveScenario(req.Context(), resolveReq)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						w.WriteHeader(http.StatusNoContent)
+						return
+					}
+					log.Error("failed to resolve scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to resolve scenario", http.StatusInternalServerError)
+					return
+				}
+
+				writeJSON(w, http.StatusOK, scenario)
+			})
+
+			r.Get("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
+				id, err := uuid.Parse(chi.URLParam(req, "id"))
+				if err != nil {
+					http.Error(w, "invalid scenario id", http.StatusBadRequest)
+					return
+				}
+
+				scenario, err := store.GetScenarioByID(req.Context(), id)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "scenario not found", http.StatusNotFound)
+						return
+					}
+					log.Error("failed to get scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to get scenario", http.StatusInternalServerError)
+					return
+				}
+
+				if req.URL.Query().Get("preview") != "1" && !scenario.IsPublished() {
+					http.Error(w, "scenario is not published", http.StatusNotFound)
+					return
+				}
+
+				writeJSON(w, http.StatusOK, scenario)
+			})
+
+			r.Post("/events", func(w http.ResponseWriter, req *http.Request) {
+				var events []models.CreateEventReq
+				if err := json.NewDecoder(req.Body).Decode(&events); err != nil {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
+				}
+
+				accepted := make([]models.CreateEventReq, 0, len(events))
+				for _, event := range events {
+					if event.EventType.Valid() && event.SessionID != "" && event.ScenarioID != uuid.Nil {
+						accepted = append(accepted, event)
+					}
+				}
+
+				if err := store.CreateAnalyticsEvents(req.Context(), accepted); err != nil {
+					log.Error("failed to store analytics events", slog.String("error", err.Error()))
+				}
+
+				w.WriteHeader(http.StatusAccepted)
+			})
 		})
 	})
 
