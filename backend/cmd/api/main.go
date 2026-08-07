@@ -186,6 +186,62 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 			}
 			writeJSON(w, http.StatusOK, scenario)
 		})
+
+		r.Get("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+			session_id, err := uuid.Parse(chi.URLParam(req, "session_id"))
+			if err != nil {
+				http.Error(w, "invalid session id", http.StatusBadRequest)
+				return
+			}
+
+			progress, err := store.GetProgress(req.Context(), id, session_id)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "scenario not found", http.StatusNotFound)
+					return
+				}
+			}
+			writeJSON(w, http.StatusOK, progress)
+		})
+
+		r.Put("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+			var updateReq models.UpsertProgressReq
+			if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			err := store.UpsertProgress(req.Context(), id, updateReq)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "scenario not found", http.StatusNotFound)
+					return
+				}
+				log.Error("failed to update scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to update scenario", http.StatusInternalServerError)
+				return
+			}
+			progress, err := store.GetProgress(req.Context(), id, updateReq.SessionID)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "progress not found", http.StatusNotFound)
+					return
+				}
+				log.Error("failed to fetch updated progress for scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to fetch updated progress for scenario", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, progress)
+		})
 	})
 
 	return r
