@@ -6,7 +6,6 @@ import { CreateListingPage } from './pages/CreateListingPage';
 import { DeliveryPage } from './pages/DeliveryPage';
 import { MyListingsPage } from './pages/MyListingsPage';
 
-/** В личном кабинете вторая строка шапки другая — без поиска. */
 const PROFILE_PATHS = ['/my', '/orders'];
 
 export function App() {

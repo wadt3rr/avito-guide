@@ -19,7 +19,6 @@ export interface Listing {
   city: string;
   categoryId: string;
   publishedAgo: string;
-  /** Эмодзи вместо фотографии: чужие снимки не тащим, а плитка не должна быть пустой. */
   photo: string;
   hasDelivery: boolean;
   photoCount: number;
