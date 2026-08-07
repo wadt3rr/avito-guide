@@ -1,12 +1,12 @@
 import { Button } from '../Button/Button'
 import { Icon } from '../Icon/Icon'
-import './ListingCard.scss'
+import './ScenariosCard.scss'
 
-export type ListingStatus = 'published' | 'draft'
+export type ScenarioStatus = 'published' | 'draft'
 
-export type ListingCardProps = {
+export type ScenariosCardProps = {
   title: string
-  status: ListingStatus
+  status: ScenarioStatus
   steps: number
   path: string
   canOpen?: boolean
@@ -15,7 +15,7 @@ export type ListingCardProps = {
 const statusLabels = {
   published: 'Опубликован',
   draft: 'Черновик',
-} satisfies Record<ListingStatus, string>
+} satisfies Record<ScenarioStatus, string>
 
 function formatSteps(steps: number) {
   const lastDigit = steps % 10
@@ -36,38 +36,38 @@ function formatSteps(steps: number) {
   return `${steps} шагов`
 }
 
-export function ListingCard({
+export function ScenariosCard({
   canOpen = false,
   path,
   status,
   steps,
   title,
-}: ListingCardProps) {
+}: ScenariosCardProps) {
   return (
-    <article className="listing-card">
-      <div className="listing-card__header">
-        <h2 className="listing-card__title">{title}</h2>
+    <article className="scenarios-card">
+      <div className="scenarios-card__header">
+        <h2 className="scenarios-card__title">{title}</h2>
         <span
-          className={`listing-card__status listing-card__status--${status}`}
+          className={`scenarios-card__status scenarios-card__status--${status}`}
         >
-          <span className="listing-card__status-dot" />
+          <span className="scenarios-card__status-dot" />
           {statusLabels[status]}
         </span>
       </div>
 
-      <div className="listing-card__metadata">
-        <span className="listing-card__chip">
+      <div className="scenarios-card__metadata">
+        <span className="scenarios-card__chip">
           <Icon name="list" size={14} />
           {formatSteps(steps)}
         </span>
-        <span className="listing-card__chip">
+        <span className="scenarios-card__chip">
           <Icon name="link" size={14} />
           {path}
         </span>
       </div>
 
-      <div className="listing-card__footer">
-        <div className="listing-card__actions">
+      <div className="scenarios-card__footer">
+        <div className="scenarios-card__actions">
           {canOpen && <Button variant="secondary">Открыть</Button>}
           <Button>Редактировать</Button>
         </div>

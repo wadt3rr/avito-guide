@@ -1,9 +1,10 @@
 import { Button } from '../../components/Button/Button'
+import { CreateScenarioCard } from '../../components/CreateScenarioCard/CreateScenarioCard'
 import { Icon } from '../../components/Icon/Icon'
 import {
-  ListingCard,
-  type ListingCardProps,
-} from '../../components/ListingCard/ListingCard'
+  ScenariosCard,
+  type ScenariosCardProps,
+} from '../../components/ScenariosCard/ScenariosCard'
 import { Sidebar } from '../../components/Sidebar/Sidebar'
 import './ScenariosPage.scss'
 
@@ -28,7 +29,7 @@ const scenarios = [
     path: '/premium',
     canOpen: true,
   },
-] satisfies ListingCardProps[]
+] satisfies ScenariosCardProps[]
 
 const topNavigation = ['Все сценарии', 'Шаблоны', 'Архив']
 
@@ -70,18 +71,10 @@ export function ScenariosPage() {
 
           <section aria-label="Список сценариев" className="scenarios-grid">
             {scenarios.map((scenario) => (
-              <ListingCard key={scenario.title} {...scenario} />
+              <ScenariosCard key={scenario.title} {...scenario} />
             ))}
 
-            <button className="new-scenario-card" type="button">
-              <span className="new-scenario-card__icon">
-                <Icon name="add" size={24} />
-              </span>
-              <span className="new-scenario-card__title">Новый сценарий</span>
-              <span className="new-scenario-card__description">
-                Начать с чистого листа
-              </span>
-            </button>
+            <CreateScenarioCard />
           </section>
         </div>
       </main>
