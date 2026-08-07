@@ -1,6 +1,9 @@
 export type IconName =
   | 'add'
   | 'analytics'
+  | 'arrow-left'
+  | 'close'
+  | 'grip'
   | 'link'
   | 'list'
   | 'logout'
@@ -22,6 +25,28 @@ const iconPaths: Record<IconName, React.ReactNode> = {
       <path d="M10 19V5" />
       <path d="M16 19v-7" />
       <path d="M22 19V3" />
+    </>
+  ),
+  'arrow-left': (
+    <>
+      <path d="m15 18-6-6 6-6" />
+      <path d="M9 12h11" />
+    </>
+  ),
+  close: (
+    <>
+      <path d="m6 6 12 12" />
+      <path d="M18 6 6 18" />
+    </>
+  ),
+  grip: (
+    <>
+      <circle cx="9" cy="6" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="6" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="18" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="18" r="1" fill="currentColor" stroke="none" />
     </>
   ),
   link: (

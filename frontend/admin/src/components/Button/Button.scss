@@ -53,6 +53,20 @@
     }
   }
 
+  &--danger {
+    color: #ff4053;
+    background: transparent;
+
+    &:hover:not(:disabled) {
+      background: #ffebed;
+    }
+
+    &:active:not(:disabled) {
+      background: #ffdde1;
+      transform: translateY(1px);
+    }
+  }
+
   &:focus-visible {
     @include mixins.focus-ring;
   }
