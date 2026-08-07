@@ -62,8 +62,6 @@ p {
   padding: 0 24px;
 }
 
-/* ─── Шапка ─────────────────────────────────────────────── */
-
 .header__utility {
   display: flex;
   justify-content: space-between;
@@ -278,8 +276,6 @@ p {
   color: var(--brand);
 }
 
-/* ─── Кнопки ────────────────────────────────────────────── */
-
 .btn {
   display: inline-flex;
   align-items: center;
@@ -306,8 +302,6 @@ p {
 .btn--plain:hover {
   color: var(--brand);
 }
-
-/* ─── Главная: категории ────────────────────────────────── */
 
 .catalog {
   padding-top: 4px;
@@ -357,8 +351,6 @@ p {
   font-size: 46px;
   line-height: 1;
 }
-
-/* ─── Главная: блок для бизнеса ─────────────────────────── */
 
 .business {
   background: var(--tile);
@@ -413,8 +405,6 @@ p {
   background: var(--bg);
   font-weight: 500;
 }
-
-/* ─── Главная: баннер ───────────────────────────────────── */
 
 .promo-banner {
   display: flex;
@@ -495,8 +485,6 @@ p {
   font-weight: 600;
   white-space: nowrap;
 }
-
-/* ─── Главная: лента ────────────────────────────────────── */
 
 .feed {
   display: grid;
@@ -597,7 +585,6 @@ p {
   color: var(--muted);
 }
 
-/* ─── Подача объявления ─────────────────────────────────── */
 .additem {
   position: relative;
   padding-top: 20px;
@@ -755,7 +742,6 @@ p {
   align-items: center;
 }
 
-/* Первый слот крупный — как основная кнопка загрузки. */
 .photos {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -828,8 +814,6 @@ p {
   color: var(--muted);
   margin-top: 18px;
 }
-
-/* ─── Личный кабинет ────────────────────────────────────── */
 
 .profile {
   display: grid;
@@ -1042,8 +1026,6 @@ p {
   min-width: 220px;
 }
 
-/* ─── Строки объявлений ─────────────────────────────────── */
-
 .rows {
   display: flex;
   flex-direction: column;
@@ -1156,8 +1138,6 @@ p {
 .row__action:hover {
   background: var(--tile-hover);
 }
-
-/* ─── Заказы ────────────────────────────────────────────── */
 
 .order {
   border: 1px solid var(--border);
@@ -1335,8 +1315,6 @@ p {
   cursor: pointer;
 }
 
-/* ─── Подвал ────────────────────────────────────────────── */
-
 .footer {
   border-top: 1px solid var(--border);
   padding: 28px 0 40px;
@@ -1363,8 +1341,6 @@ p {
   color: var(--muted);
   max-width: 720px;
 }
-
-/* ─── Узкие экраны ──────────────────────────────────────── */
 
 @media (max-width: 1180px) {
   .catalog__top {

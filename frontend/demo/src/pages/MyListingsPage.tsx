@@ -1,6 +1,8 @@
+import { useSearchParams } from 'react-router-dom';
 import { ProfileSidebar } from '../components/ProfileSidebar';
 import { MY_LISTINGS, type MyListing } from '../data/mock';
 import { anchor } from '../onboarding-anchors';
+import { useOnboardingContext } from '../onboarding-context';
 
 const TABS = [
   { label: 'Ждут действий', count: 2 },
@@ -9,13 +11,17 @@ const TABS = [
   { label: 'Архив', count: 27 },
 ];
 
-/**
- * Мои объявления — сцена сценария 3 «объявление не продаётся».
- * Онбординг здесь запускается не по факту захода на страницу, а по данным:
- * объявление долго висит и почти не набирает просмотров. Таких карточек две,
- * в разных вертикалях — товар и резюме: механика одна, содержание разное.
- */
 export function MyListingsPage() {
+  const [params] = useSearchParams();
+  const requested = params.get('vertical');
+  const stale = MY_LISTINGS.find((listing) =>
+    requested ? listing.isStale && listing.vertical === requested : listing.isStale,
+  );
+
+  useOnboardingContext(
+    stale ? { segment: 'stale', vertical: stale.vertical } : { segment: 'healthy' },
+  );
+
   return (
     <div className="container profile">
       <ProfileSidebar active="Мои объявления" />

@@ -1,10 +1,5 @@
 import type { Listing } from '../data/mock';
 
-/**
- * Карточка ленты. Мелкие детали — счётчик фотографий, значок доставки,
- * рейтинг продавца, сердечко — дают ощущение настоящего сайта сильнее,
- * чем сама картинка, поэтому вместо фото достаточно эмодзи на подложке.
- */
 export function ListingCard({ listing }: { listing: Listing }) {
   return (
     <article className="listing">

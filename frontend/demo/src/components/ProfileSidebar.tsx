@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom';
 import { PROFILE_MENU, PROFILE_NAME, PROFILE_RATING, PROFILE_REVIEWS } from '../data/mock';
 import { anchor } from '../onboarding-anchors';
 
-/** Боковое меню личного кабинета — общее для «Моих объявлений» и «Заказов». */
 export function ProfileSidebar({ active }: { active: string }) {
   return (
     <aside className="profile-side" {...anchor('profile-menu')}>
