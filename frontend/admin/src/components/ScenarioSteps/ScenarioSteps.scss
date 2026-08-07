@@ -1,0 +1,131 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.scenario-steps {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.32fr) minmax(0, 1fr);
+  gap: 48px;
+
+  &__heading {
+    h2 {
+      margin: 0;
+      color: tokens.$color-ink;
+      font: 700 20px/26px tokens.$font-heading;
+    }
+  }
+
+  &__eyebrow {
+    margin: 0 0 6px;
+    color: tokens.$color-ink-faint;
+    font: 700 11.5px/16px tokens.$font-ui;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  &__description {
+    max-width: 210px;
+    margin: 8px 0 0;
+    color: tokens.$color-ink-soft;
+    font: 400 13px/20px tokens.$font-ui;
+  }
+
+  &__content {
+    min-width: 0;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+
+  &__add {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    color: tokens.$color-accent;
+    background: transparent;
+    border: 0;
+    border-radius: tokens.$radius-control;
+    font: 700 13px/18px tokens.$font-ui;
+    cursor: pointer;
+
+    &:hover {
+      background: rgb(0 144 222 / 8%);
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+  }
+
+  @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+    grid-template-columns: 1fr;
+    gap: 22px;
+
+    &__description {
+      max-width: none;
+    }
+  }
+}
+
+.scenario-step {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  color: tokens.$color-ink;
+  background: tokens.$color-surface-muted;
+  border: 0;
+  border-radius: 10px;
+  font-family: tokens.$font-ui;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+
+  &__number {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: tokens.$color-accent;
+    background: rgb(0 144 222 / 10%);
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  &__name {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__grip {
+    color: tokens.$color-ink-faint;
+  }
+
+  &:hover {
+    background: tokens.$color-surface-hover;
+    transform: translateX(2px);
+  }
+
+  &:focus-visible {
+    @include mixins.focus-ring;
+  }
+}

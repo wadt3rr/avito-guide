@@ -1,0 +1,79 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.scenario-details {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.32fr) minmax(0, 1fr);
+  gap: 48px;
+
+  &__heading {
+    h2 {
+      margin: 0;
+      color: tokens.$color-ink;
+      font: 700 20px/26px tokens.$font-heading;
+    }
+  }
+
+  &__eyebrow {
+    margin: 0 0 6px;
+    color: tokens.$color-ink-faint;
+    font: 700 11.5px/16px tokens.$font-ui;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+}
+
+.scenario-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  &__label {
+    color: tokens.$color-ink-soft;
+    font: 700 12.5px/16px tokens.$font-ui;
+  }
+
+  &__control {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 14px;
+    color: tokens.$color-ink;
+    background: tokens.$color-surface-muted;
+    border: 0;
+    border-radius: 10px;
+    font: 400 14px/20px tokens.$font-ui;
+    transition:
+      background-color 150ms ease,
+      outline-color 150ms ease;
+
+    &:hover {
+      background: tokens.$color-surface-hover;
+    }
+
+    &:focus {
+      background: tokens.$color-surface;
+      @include mixins.focus-ring;
+    }
+
+    &--textarea {
+      min-height: 104px;
+      resize: vertical;
+    }
+  }
+
+  &__hint {
+    color: tokens.$color-ink-faint;
+    font: 500 11.5px/16px tokens.$font-ui;
+  }
+}
