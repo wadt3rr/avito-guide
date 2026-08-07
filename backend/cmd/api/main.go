@@ -194,9 +194,12 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				return
 			}
 
-			session_id := chi.URLParam(req, "session_id")
+			sessionID := req.URL.Query().Get("session_id")
+			if sessionID == "" {
+				sessionID = chi.URLParam(req, "session_id")
+			}
 
-			progress, err := store.GetProgress(req.Context(), id, session_id)
+			progress, err := store.GetProgress(req.Context(), id, sessionID)
 			if err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
 					http.Error(w, "scenario not found", http.StatusNotFound)
@@ -293,6 +296,7 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 			http.MethodGet,
 			http.MethodPost,
 			http.MethodPut,
+			http.MethodPatch,
 			http.MethodDelete,
 			http.MethodOptions,
 		},

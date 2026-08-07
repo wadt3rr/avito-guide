@@ -167,11 +167,11 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 			name: "create scenario with one step",
 			scenario: models.Scenario{
 				Title:       "Test scenario",
-				Description: "Scenario description",
+				Description: ptrString("Scenario description"),
 				Status:      "draft",
 				Steps: []models.Step{{
 					Title:       "First step",
-					Description: "First description",
+					Description: ptrString("First description"),
 					Content:     "Click button",
 					Selector:    "button.submit",
 					ActionType:  "click",
@@ -274,7 +274,7 @@ func TestStorage_GetScenarioByID(t *testing.T) {
 			if tt.prepare {
 				scenario := models.Scenario{
 					Title:       tt.wantTitle,
-					Description: "Prepared scenario",
+					Description: ptrString("Prepared scenario"),
 					Status:      "draft",
 					Steps: []models.Step{{
 						Title:      "Step",
@@ -369,7 +369,7 @@ func TestStorage_UpdateScenario(t *testing.T) {
 			if tt.prepare {
 				scenario := models.Scenario{
 					Title:       "Initial scenario",
-					Description: "Initial description",
+					Description: ptrString("Initial description"),
 					Status:      "draft",
 					Steps: []models.Step{{
 						Title:      "Initial step",
@@ -416,6 +416,96 @@ func TestStorage_UpdateScenario(t *testing.T) {
 	}
 }
 
+func TestStorage_ProgressAndAnalytics(t *testing.T) {
+	cases := []struct {
+		name    string
+		prepare func(t *testing.T, ctx context.Context, store *Storage)
+		assert  func(t *testing.T, ctx context.Context, store *Storage)
+		wantErr bool
+	}{
+		{
+			name: "progress upsert and read",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) {
+				scenarioID := uuid.New()
+				_, err := store.CreateScenario(ctx, &models.Scenario{ID: scenarioID, Title: "Progress scenario", Status: "draft"})
+				if err != nil {
+					t.Fatalf("CreateScenario failed: %v", err)
+				}
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage) {
+				scenarioID := uuid.New()
+				_, _ = store.CreateScenario(ctx, &models.Scenario{ID: scenarioID, Title: "Progress scenario", Status: "draft"})
+				progress, err := store.UpsertProgress(ctx, scenarioID, models.UpsertProgressReq{SessionID: "s1", Status: ptrProgressStatus(models.ProgressInProgress), CurrentStep: ptrInt(2)})
+				if err != nil {
+					t.Fatalf("UpsertProgress failed: %v", err)
+				}
+				if progress.SessionID != "s1" {
+					t.Fatalf("expected session id s1, got %s", progress.SessionID)
+				}
+				fetched, err := store.GetProgress(ctx, scenarioID, "s1")
+				if err != nil {
+					t.Fatalf("GetProgress failed: %v", err)
+				}
+				if fetched.CurrentStep != 2 {
+					t.Fatalf("expected current step 2, got %d", fetched.CurrentStep)
+				}
+			},
+		},
+		{
+			name: "analytics event and summary",
+			assert: func(t *testing.T, ctx context.Context, store *Storage) {
+				scenarioID := uuid.New()
+				_, err := store.CreateScenario(ctx, &models.Scenario{ID: scenarioID, Title: "Analytics scenario", Status: "draft"})
+				if err != nil {
+					t.Fatalf("CreateScenario failed: %v", err)
+				}
+				if err := store.CreateAnalyticsEvent(ctx, models.CreateEventReq{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventStarted}); err != nil {
+					t.Fatalf("CreateAnalyticsEvent failed: %v", err)
+				}
+				if err := store.CreateAnalyticsEvent(ctx, models.CreateEventReq{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventFinished}); err != nil {
+					t.Fatalf("CreateAnalyticsEvent failed: %v", err)
+				}
+				analytics, err := store.GetScenarioAnalytics(ctx, scenarioID)
+				if err != nil {
+					t.Fatalf("GetScenarioAnalytics failed: %v", err)
+				}
+				if analytics.Started != 1 || analytics.Finished != 1 {
+					t.Fatalf("expected started=1 finished=1, got %+v", analytics)
+				}
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			dsn, cleanup := setupTestDatabase(ctx, t)
+			t.Cleanup(cleanup)
+
+			store, err := NewStorage(ctx, dsn, testMigrationsPath(t))
+			if err != nil {
+				t.Fatalf("NewStorage failed: %v", err)
+			}
+			defer store.Close()
+
+			if tt.prepare != nil {
+				tt.prepare(t, ctx, store)
+			}
+			if tt.assert != nil {
+				tt.assert(t, ctx, store)
+			}
+		})
+	}
+}
+
 func ptrString(value string) *string {
+	return &value
+}
+
+func ptrInt(value int) *int {
+	return &value
+}
+
+func ptrProgressStatus(value models.ProgressStatus) *models.ProgressStatus {
 	return &value
 }
