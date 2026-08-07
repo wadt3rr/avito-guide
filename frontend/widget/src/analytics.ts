@@ -1,14 +1,5 @@
 import type { EventType, OnboardingEvent, WidgetConfig } from './types';
 
-/**
- * Отправка событий прохождения.
- *
- * События копятся в очереди и уходят пачкой. При уходе со страницы обычный
- * запрос браузер обрывает — и теряется ровно то событие, ради которого всё
- * затевалось: «человек бросил на шаге два». Поэтому на выходе используем
- * sendBeacon, он переживает закрытие вкладки.
- */
-
 const FLUSH_INTERVAL_MS = 3000;
 
 export interface TrackerIdentity {
@@ -38,14 +29,11 @@ export class Analytics {
     meta?: Record<string, unknown>,
   ): void {
     const event: OnboardingEvent = {
-      type,
+      event_type: type,
       scenario_id: scenarioId,
       step_id: stepId,
       anon_id: this.identity.anonId,
       session_id: this.identity.sessionId,
-      url: location.pathname,
-      created_at: new Date().toISOString(),
-      ...(meta ? { meta } : {}),
     };
 
     if (this.config.debug) {
@@ -80,15 +68,13 @@ export class Analytics {
     const url = `${this.config.apiUrl}/api/v1/embed/events`;
     const body = JSON.stringify(batch);
 
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    if (navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain;charset=UTF-8' }))) {
       return;
     }
 
-    // Аналитика никогда не должна ронять хост-приложение.
     void fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body,
       keepalive: true,
     }).catch(() => undefined);

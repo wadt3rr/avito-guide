@@ -4,17 +4,6 @@ import { Runner } from './runner';
 import { createSource } from './source';
 import type { ResolveContext, WidgetConfig } from './types';
 
-/**
- * Точка входа. Сайт подключает виджет одной строкой:
- *
- *   <script src=".../widget.js" data-api="http://localhost:8081"></script>
- *
- * Ничего импортировать и вызывать не требуется. Страница может дополнительно
- * сообщить о себе факты — сегмент, вертикаль, стадию сделки — через
- * window.AvitoOnboarding.identify(); без них работают сценарии,
- * которым достаточно адреса страницы.
- */
-
 interface PublicApi {
   identify(facts: Record<string, string>): void;
   start(): Promise<void>;
@@ -46,22 +35,35 @@ const analytics = new Analytics(config, {
 });
 
 let running: Runner | null = null;
+let runningPath = '';
+let queue: Promise<void> = Promise.resolve();
 
-async function start(): Promise<void> {
-  if (running) return;
+async function resolveAndRun(): Promise<void> {
+  if (running) {
+    if (runningPath === location.pathname) return;
+    running.stop('navigated');
+  }
 
   const context: ResolveContext = {
     url: location.pathname,
     anon_id: getAnonId(),
     session_id: getSessionId(),
-    context: facts,
+    context: { ...facts },
   };
 
   const scenario = await createSource(config).resolve(context);
   if (!scenario || scenario.steps.length === 0) return;
 
-  running = new Runner(scenario, analytics);
+  runningPath = location.pathname;
+  running = new Runner(scenario, analytics, () => {
+    running = null;
+  });
   await running.start();
+}
+
+function start(): Promise<void> {
+  queue = queue.then(resolveAndRun, resolveAndRun);
+  return queue;
 }
 
 window.AvitoOnboarding = {
@@ -71,7 +73,6 @@ window.AvitoOnboarding = {
   start,
 };
 
-// Дожидаемся готовности разметки: до неё искать цели бессмысленно.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => void start(), { once: true });
 } else {

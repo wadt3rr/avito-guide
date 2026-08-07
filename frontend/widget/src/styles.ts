@@ -1,14 +1,8 @@
-/**
- * Стили живут строкой и уезжают внутрь Shadow DOM. Наружу они не протекают,
- * а стили сайта-хозяина не достают до подсказки.
- */
 export const STYLES = `
 :host {
   all: initial;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
 }
-
-* { box-sizing: border-box; }
 
 .spot {
   position: fixed;

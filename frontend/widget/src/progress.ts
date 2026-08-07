@@ -1,7 +1,3 @@
-/**
- * Прогресс прохождения. Нужен, чтобы перезагрузка не начинала тур заново
- * и чтобы сценарий доставки мог тянуться несколько дней и сессий.
- */
 
 const PREFIX = 'avito-onboarding:';
 
@@ -15,7 +11,6 @@ function read<T>(key: string): T | null {
     const raw = localStorage.getItem(PREFIX + key);
     return raw ? (JSON.parse(raw) as T) : null;
   } catch {
-    // Приватный режим или переполненное хранилище — не повод ломать сценарий.
     return null;
   }
 }
@@ -24,7 +19,7 @@ function write(key: string, value: unknown): void {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));
   } catch {
-    /* см. выше */
+    return;
   }
 }
 
@@ -36,7 +31,6 @@ export function saveProgress(scenarioId: string, step: number, finished = false)
   write(`progress:${scenarioId}`, { step, finished });
 }
 
-/** Устойчивый анонимный идентификатор для воронки. Персональных данных не содержит. */
 export function getAnonId(): string {
   const existing = read<string>('anon');
   if (existing) return existing;
@@ -46,7 +40,6 @@ export function getAnonId(): string {
   return id;
 }
 
-/** Идентификатор вкладки: отличает один заход от другого. */
 export function getSessionId(): string {
   const KEY = PREFIX + 'session';
   try {

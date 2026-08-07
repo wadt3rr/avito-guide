@@ -4,14 +4,6 @@ import { getProgress, saveProgress } from './progress';
 import type { Scenario } from './types';
 import { Ui } from './ui';
 
-/**
- * Прохождение сценария как явная машина состояний.
- *
- * Альтернатива — набор флагов вида isVisible/isWaiting/currentStep — на третьем
- * сценарии превращается в кашу и даёт кривую воронку: события начинают
- * отправляться дважды или не отправляться вовсе. Здесь каждый переход
- * порождает ровно одно событие.
- */
 type State = 'idle' | 'resolving' | 'showing' | 'finished' | 'aborted';
 
 export class Runner {
@@ -23,6 +15,7 @@ export class Runner {
   constructor(
     private readonly scenario: Scenario,
     private readonly analytics: Analytics,
+    private readonly onEnd: () => void,
   ) {
     this.onKeyDown = this.onKeyDown.bind(this);
   }
@@ -43,14 +36,13 @@ export class Runner {
     });
     document.addEventListener('keydown', this.onKeyDown);
 
-    this.analytics.track('scenario_started', this.scenario.id, null, {
+    this.analytics.track('started', this.scenario.id, null, {
       resumed_at_step: this.index,
     });
 
     await this.enter(this.index);
   }
 
-  /** Показывает шаг. Если цель не нашлась — честно сообщает и идёт дальше. */
   private async enter(index: number): Promise<void> {
     if (this.state === 'finished' || this.state === 'aborted') return;
 
@@ -71,7 +63,6 @@ export class Runner {
     if (this.pending.signal.aborted) return;
 
     if (!target) {
-      // Единственный сигнал команде, что сценарий сломан вёрсткой.
       this.analytics.track('step_failed', this.scenario.id, step.id, {
         selector: step.selector,
         reason: 'target_not_found',
@@ -97,10 +88,9 @@ export class Runner {
     );
   }
 
-  /** Ни один шаг не нашёлся до конца сценария — показывать больше нечего. */
   private async skipUnresolvable(index: number): Promise<void> {
     if (index + 1 >= this.scenario.steps.length) {
-      this.analytics.track('scenario_dismissed', this.scenario.id, null, {
+      this.analytics.track('dismissed', this.scenario.id, null, {
         reason: 'no_resolvable_steps',
       });
       return this.teardown('aborted');
@@ -124,19 +114,24 @@ export class Runner {
   }
 
   private finish(): void {
-    this.analytics.track('scenario_finished', this.scenario.id, null);
+    this.analytics.track('finished', this.scenario.id, null);
     saveProgress(this.scenario.id, this.scenario.steps.length, true);
     this.teardown('finished');
   }
 
-  private dismiss(): void {
+  stop(reason: string): void {
     if (this.state === 'finished' || this.state === 'aborted') return;
 
     const step = this.scenario.steps[this.index];
-    this.analytics.track('scenario_dismissed', this.scenario.id, step?.id ?? null, {
+    this.analytics.track('dismissed', this.scenario.id, step?.id ?? null, {
       at_step: this.index,
+      reason,
     });
     this.teardown('aborted');
+  }
+
+  private dismiss(): void {
+    this.stop('user_closed');
   }
 
   private teardown(state: State): void {
@@ -145,6 +140,7 @@ export class Runner {
     document.removeEventListener('keydown', this.onKeyDown);
     this.ui?.destroy();
     this.ui = null;
+    this.onEnd();
   }
 
   private onKeyDown(event: KeyboardEvent): void {
