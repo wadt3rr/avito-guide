@@ -1,10 +1,14 @@
-name: Check branches
+name: Backend Check
 
 on:
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'backend/**'
   push:
     branches: [ "**" ]
+    paths:
+      - 'backend/**'
 
 jobs:
   build-and-test:
@@ -26,6 +30,12 @@ jobs:
 
       - name: Download dependencies
         run: go mod download
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          working-directory: ./backend
 
       - name: Run tests
         run: go test -v ./...

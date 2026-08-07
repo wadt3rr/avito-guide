@@ -26,13 +26,13 @@ type Storage struct {
 func NewStorage(ctx context.Context, dsn string, migrationsPath string) (*Storage, error) {
 	const op = "postgres.NewStorage"
 
-	//Создаем пулл соединений
+	// Создаем пулл соединений
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("%s: failed to create connection pool: %w", op, err)
 	}
 
-	//Запуск миграций
+	// Запуск миграций
 	if err = runMigrations(migrationsPath, dsn); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("%s: failed to run migrations: %w", op, err)
@@ -69,7 +69,9 @@ func runMigrations(migrationsPath, dsn string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
-	defer m.Close()
+	defer func() {
+		_, _ = m.Close()
+	}()
 
 	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration up failed: %w", err)
@@ -85,14 +87,16 @@ func runMigrations(migrationsPath, dsn string) error {
 func (s *Storage) CreateScenario(ctx context.Context, scenario *models.Scenario) (uuid.UUID, error) {
 	const op = "postgres.Storage.CreateScenario"
 
-	//Запуск транзакции
+	// Запуск транзакции
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%s: failed to begin transaction: %w", op, err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
-	//Создание сценария
+	// Создание сценария
 	id, err := uuid.NewV7()
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%s: failed to create scenario id: %w", op, err)
@@ -184,7 +188,9 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 	if err != nil {
 		return nil, fmt.Errorf("%s: begin tx: %w", op, err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var sc models.Scenario
 
@@ -261,7 +267,9 @@ func (s *Storage) UpdateScenario(ctx context.Context, id uuid.UUID, req models.U
 	if err != nil {
 		return fmt.Errorf("%s:failed to begin tx: %w", op, err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 	query := "UPDATE scenarios SET updated_at = $1"
 	args := []any{time.Now().UTC()}
 	argPos := 2

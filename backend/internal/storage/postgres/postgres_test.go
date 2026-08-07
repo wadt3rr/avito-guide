@@ -109,7 +109,7 @@ func setupTestDatabase(ctx context.Context, t *testing.T) (string, func()) {
 	}
 
 	cleanup := func() {
-		adminPool.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", pgx.Identifier{testDB}.Sanitize()))
+		_, _ = adminPool.Exec(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", pgx.Identifier{testDB}.Sanitize()))
 		adminPool.Close()
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -34,6 +35,13 @@ func init() {
 }
 
 func main() {
+	if err := run(); err != nil {
+		slog.Error("application stopped with error", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg := config.MustLoad()
 	log := setupLogger(cfg.Env)
 
@@ -42,8 +50,7 @@ func main() {
 
 	storageDB, err := postgres.NewStorage(ctx, cfg.StorageDSN, cfg.MigrationsPath)
 	if err != nil {
-		log.Error("Failed to connect to database", slog.String("error", err.Error()))
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer storageDB.Close()
 
@@ -57,21 +64,29 @@ func main() {
 	}
 
 	log.Info("Starting HTTP server", slog.String("address", cfg.HTTPServer.Address))
+
+	serverErr := make(chan error, 1)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Error("server failed", slog.String("error", err.Error()))
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
-	<-ctx.Done()
-	log.Info("Shutting down HTTP server")
+	select {
+	case err := <-serverErr:
+		return fmt.Errorf("server failed: %w", err)
+	case <-ctx.Done():
+		log.Info("Shutting down HTTP server")
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Error("server shutdown failed", slog.String("error", err.Error()))
+		return fmt.Errorf("server shutdown failed: %w", err)
 	}
+
+	return nil
 }
 
 func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
@@ -176,7 +191,7 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 			http.MethodDelete,
 			http.MethodOptions,
 		},
-		AllowedHeaders: []string{"Accept", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Content-Type"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	})(next)
@@ -211,7 +226,7 @@ func setupLogger(env string) *slog.Logger {
 			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
 		)
 
-	default: //If env config is missing or invalid, use production logger
+	default: // If env config is missing or invalid, use production logger
 		log = slog.New(
 			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}),
 		)

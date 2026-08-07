@@ -15,10 +15,10 @@ type Config struct {
 }
 
 type HTTPServer struct {
-	Address     string        `env:"HTTP_ADDRESS" env-default:"localhost:8081"`
-	Timeout     time.Duration `env:"HTTP_TIMEOUT" env-default:"5s"`
-	IdleTimeout time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"60s"`
-	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" env-separator:"," env-default:"*"`
+	Address            string        `env:"HTTP_ADDRESS" env-default:"localhost:8081"`
+	Timeout            time.Duration `env:"HTTP_TIMEOUT" env-default:"5s"`
+	IdleTimeout        time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"60s"`
+	CORSAllowedOrigins []string      `env:"CORS_ALLOWED_ORIGINS" env-separator:"," env-default:"*"`
 }
 
 func MustLoad() *Config {
