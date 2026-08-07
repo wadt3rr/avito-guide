@@ -1,8 +1,8 @@
 import './App.css'
-import { ScenariosPage } from './pages/ScenariosPage/ScenariosPage'
+import { ScenarioEditorPage } from './pages/ScenarioEditorPage/ScenarioEditorPage'
 
 function App() {
-  return <ScenariosPage />
+  return <ScenarioEditorPage />
 }
 
 export default App
