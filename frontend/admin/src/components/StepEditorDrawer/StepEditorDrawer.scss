@@ -1,0 +1,203 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.step-editor-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  padding: 0;
+  background: rgb(21 24 29 / 32%);
+  border: 0;
+  cursor: default;
+}
+
+.step-editor-drawer {
+  position: fixed;
+  z-index: 41;
+  inset: 0 0 0 auto;
+  width: min(500px, 100vw);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  color: tokens.$color-ink;
+  background: tokens.$color-surface;
+  animation: drawer-enter 180ms ease-out;
+
+  &__header,
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 24px;
+  }
+
+  &__header {
+    h2 {
+      margin: 0;
+      font: 700 22px/28px tokens.$font-heading;
+    }
+  }
+
+  &__eyebrow {
+    margin: 0 0 4px;
+    color: tokens.$color-ink-faint;
+    font: 700 11.5px/16px tokens.$font-ui;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  &__close {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: tokens.$color-ink-soft;
+    background: tokens.$color-surface-muted;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+
+    &:hover {
+      color: tokens.$color-ink;
+      background: tokens.$color-surface-hover;
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding: 6px 24px 28px;
+    overflow-y: auto;
+  }
+
+  &__targets {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  &__target {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 12px;
+    color: tokens.$color-ink-soft;
+    background: tokens.$color-surface-muted;
+    border: 0;
+    border-radius: 9px;
+    font: 600 12.5px/18px tokens.$font-ui;
+    text-align: left;
+    cursor: pointer;
+
+    code {
+      flex: 0 0 auto;
+      color: tokens.$color-ink-faint;
+      font: 500 11px/16px ui-monospace, monospace;
+    }
+
+    &:hover {
+      color: tokens.$color-ink;
+      background: tokens.$color-surface-hover;
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+
+    &--selected {
+      color: tokens.$color-accent;
+      background: rgb(0 144 222 / 10%);
+
+      code {
+        color: tokens.$color-accent;
+      }
+    }
+  }
+
+  &__field-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  &__footer {
+    align-items: center;
+  }
+
+  @media (max-width: 560px) {
+    &__header,
+    &__footer {
+      padding-inline: 16px;
+    }
+
+    &__body {
+      padding-inline: 16px;
+    }
+
+    &__field-row {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.drawer-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  &__label {
+    color: tokens.$color-ink-soft;
+    font: 700 12.5px/16px tokens.$font-ui;
+  }
+
+  &__control {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 13px;
+    color: tokens.$color-ink;
+    background: tokens.$color-surface-muted;
+    border: 0;
+    border-radius: 10px;
+    font: 400 13.5px/20px tokens.$font-ui;
+
+    &:hover {
+      background: tokens.$color-surface-hover;
+    }
+
+    &:focus {
+      background: tokens.$color-surface;
+      @include mixins.focus-ring;
+    }
+
+    &--textarea {
+      min-height: 104px;
+      resize: vertical;
+    }
+  }
+
+  &__hint {
+    color: tokens.$color-ink-faint;
+    font: 500 11.5px/16px tokens.$font-ui;
+  }
+}
+
+@keyframes drawer-enter {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
