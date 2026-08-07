@@ -9,7 +9,7 @@ type Step struct {
 	ScenarioID  uuid.UUID `json:"scenario_id"`
 	StepOrder   int       `json:"step_order"`
 	Title       string    `json:"title"`
-	Description string    `json:"description,omitempty"`
+	Description *string   `json:"description,omitempty"`
 	Content     string    `json:"content"`  // текст подсказки
 	Selector    string    `json:"selector"` // CSS-селектор
 	ActionType  string    `json:"action_type"`

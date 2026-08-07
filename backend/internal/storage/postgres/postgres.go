@@ -394,4 +394,80 @@ func (s *Storage) upsertSteps(ctx context.Context, tx pgx.Tx, scenarioID uuid.UU
 	return nil
 }
 
-//TODO: ...
+func (s *Storage) GetProgress(ctx context.Context, scenarioID uuid.UUID, sessionID string) (*models.Progress, error) {
+	const op = "postgres.Storage.GetProgress"
+
+	var p models.Progress
+	err := s.pool.QueryRow(
+		ctx,
+		`SELECT * FROM user_scenario_progress WHERE scenario_id = $1 AND session_id = $2`,
+		scenarioID, sessionID,
+	).Scan(
+		&p.ID,
+		&p.ScenarioID,
+		&p.SessionID,
+		&p.Status,
+		&p.CurrentStep,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return &p, nil
+}
+
+func (s *Storage) UpsertProgress(ctx context.Context, scenarioID uuid.UUID, req models.UpsertProgressReq) (*models.Progress, error) {
+	const op = "postgres.Storage.UpsertProgress"
+
+	if req.SessionID == "" {
+		return nil, fmt.Errorf("%s: session_id is required", op)
+	}
+
+	status := models.ProgressStarted
+	if req.Status != nil {
+		status = *req.Status
+	}
+
+	currentStep := 0
+	if req.CurrentStep != nil {
+		currentStep = *req.CurrentStep
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("%s: generate id: %w", op, err)
+	}
+
+	now := time.Now().UTC()
+
+	var p models.Progress
+	err = s.pool.QueryRow(ctx, `
+        INSERT INTO user_scenario_progress (
+            id, scenario_id, session_id, status, current_step, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (scenario_id, session_id) DO UPDATE
+        SET
+            status = COALESCE(EXCLUDED.status, user_scenario_progress.status),
+            current_step = COALESCE(EXCLUDED.current_step, user_scenario_progress.current_step),
+            updated_at = EXCLUDED.updated_at
+        RETURNING id, scenario_id, session_id, status, current_step, created_at, updated_at
+    `, id, scenarioID, req.SessionID, status, currentStep, now, now).Scan(
+		&p.ID,
+		&p.ScenarioID,
+		&p.SessionID,
+		&p.Status,
+		&p.CurrentStep,
+		&p.CreatedAt,
+		&p.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return &p, nil
+}

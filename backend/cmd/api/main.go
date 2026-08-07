@@ -95,7 +95,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Route("/api", func(r chi.Router) {
+	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/scenarios", func(w http.ResponseWriter, req *http.Request) {
 			scenarios, err := store.GetScenarios(req.Context())
 			if err != nil {
@@ -133,19 +133,29 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				return
 			}
 
+			if strings.TrimSpace(scenario.Title) == "" {
+				http.Error(w, "title is required", http.StatusBadRequest)
+				return
+			}
+
 			id, err := store.CreateScenario(req.Context(), &scenario)
 			if err != nil {
 				log.Error("failed to create scenario", slog.String("error", err.Error()))
 				http.Error(w, "failed to create scenario", http.StatusInternalServerError)
 				return
 			}
-			scenario.ID = id
-			scenario.CreatedAt = time.Now().UTC()
-			scenario.UpdatedAt = scenario.CreatedAt
-			writeJSON(w, http.StatusCreated, scenario)
+
+			created, err := store.GetScenarioByID(req.Context(), id)
+			if err != nil {
+				log.Error("failed to get created scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to get created scenario", http.StatusInternalServerError)
+				return
+			}
+
+			writeJSON(w, http.StatusCreated, created)
 		})
 
-		r.Put("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
+		r.Patch("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
 			id, err := uuid.Parse(chi.URLParam(req, "id"))
 			if err != nil {
 				http.Error(w, "invalid scenario id", http.StatusBadRequest)
