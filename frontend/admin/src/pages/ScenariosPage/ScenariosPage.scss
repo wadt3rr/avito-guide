@@ -1,0 +1,218 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.scenarios-page {
+  min-height: 100svh;
+  color: tokens.$color-ink;
+  background: tokens.$color-canvas;
+
+  &__main {
+    min-height: 100svh;
+    margin-left: tokens.$sidebar-width;
+
+    @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+      margin-left: 0;
+    }
+  }
+
+  &__content {
+    width: min(100%, tokens.$content-max-width);
+    padding: 48px 36px;
+    margin: 0 auto;
+
+    @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+      padding: 32px 24px;
+    }
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      padding: 28px 16px;
+    }
+  }
+
+  &__heading-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 40px;
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      align-items: flex-start;
+      flex-direction: column;
+      margin-bottom: 28px;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    color: tokens.$color-ink;
+    font: 700 26px/32px tokens.$font-heading;
+    letter-spacing: -0.02em;
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      font-size: 22px;
+      line-height: 28px;
+      letter-spacing: 0;
+    }
+  }
+
+  &__create-button {
+    min-height: 40px;
+    padding-inline: 20px;
+    font-size: 15.5px;
+    line-height: 20px;
+  }
+}
+
+.topbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 36px;
+  background: tokens.$color-surface;
+  border-bottom: 1px solid tokens.$color-border;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+
+  &__navigation {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  &__link {
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    color: tokens.$color-ink-soft;
+    border-bottom: 2px solid transparent;
+    font: 600 14px/20px tokens.$font-ui;
+    text-decoration: none;
+    transition:
+      color 150ms ease,
+      border-color 150ms ease;
+
+    &:hover {
+      color: tokens.$color-accent;
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+
+    &--active {
+      color: tokens.$color-accent;
+      border-bottom-color: tokens.$color-accent;
+      font-weight: 700;
+    }
+  }
+
+  &__search {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: tokens.$color-ink-soft;
+    background: transparent;
+    border: 0;
+    border-radius: tokens.$radius-control;
+    cursor: pointer;
+    transition:
+      color 150ms ease,
+      background-color 150ms ease;
+
+    &:hover {
+      color: tokens.$color-accent;
+      background: tokens.$color-surface-muted;
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+  }
+
+  @include mixins.desktop-only;
+}
+
+.scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+
+  @media (max-width: #{tokens.$breakpoint-grid - 1px}) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.new-scenario-card {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: tokens.$color-ink;
+  background: tokens.$color-canvas;
+  border: 2px dashed tokens.$color-border;
+  border-radius: tokens.$radius-card;
+  font-family: tokens.$font-ui;
+  cursor: pointer;
+  transition:
+    color 200ms ease,
+    background-color 200ms ease,
+    border-color 200ms ease;
+
+  &__icon {
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    color: tokens.$color-ink-soft;
+    background: tokens.$color-surface-muted;
+    border-radius: 50%;
+    transition:
+      color 200ms ease,
+      background-color 200ms ease;
+  }
+
+  &__title {
+    font-size: 15.5px;
+    font-weight: 700;
+    line-height: 20px;
+  }
+
+  &__description {
+    margin-top: 4px;
+    color: tokens.$color-ink-soft;
+    font-size: 11.5px;
+    font-weight: 500;
+    line-height: 14px;
+  }
+
+  &:hover {
+    color: tokens.$color-accent;
+    background: tokens.$color-surface;
+    border-color: tokens.$color-accent;
+
+    .new-scenario-card__icon {
+      color: tokens.$color-accent;
+      background: rgb(0 144 222 / 12%);
+    }
+  }
+
+  &:focus-visible {
+    @include mixins.focus-ring;
+  }
+}
