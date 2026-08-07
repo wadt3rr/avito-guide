@@ -122,8 +122,8 @@ func (s *Storage) CreateScenario(ctx context.Context, scenario *models.Scenario)
 
 		_, err = tx.Exec(
 			ctx,
-			`INSERT INTO steps (id, scenario_id, title, description, content, selector, action_type, condition, timeout) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			stepID, id, step.Title, step.Description, step.Content, step.Selector, step.ActionType, step.Condition, step.TimeoutSec,
+			`INSERT INTO steps (id, scenario_id, step_order, title, description, content, selector, action_type, condition, timeout) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			stepID, id, order, step.Title, step.Description, step.Content, step.Selector, step.ActionType, step.Condition, step.TimeoutSec,
 		)
 		if err != nil {
 			return uuid.Nil, fmt.Errorf("%s: failed insert step: %w", op, err)
@@ -150,7 +150,8 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 	}
 	defer rows.Close()
 
-	var scenarios []models.Scenario
+	// Пустой срез, а не nil: иначе пустой список уедет клиенту как null вместо [].
+	scenarios := make([]models.Scenario, 0)
 
 	for rows.Next() {
 		var sc models.Scenario
@@ -333,8 +334,6 @@ func (s *Storage) upsertSteps(ctx context.Context, tx pgx.Tx, scenarioID uuid.UU
 		}
 	}
 
-	now := time.Now().UTC()
-
 	for i, step := range steps {
 		order := step.StepOrder
 		if order == 0 {
@@ -355,7 +354,7 @@ func (s *Storage) upsertSteps(ctx context.Context, tx pgx.Tx, scenarioID uuid.UU
                 ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
             `,
 				stepID, scenarioID, order, step.Title, step.Description,
-				step.Content, step.Selector, step.ActionType, step.Condition, step.TimeoutSec, now,
+				step.Content, step.Selector, step.ActionType, step.Condition, step.TimeoutSec,
 			)
 			if err != nil {
 				return fmt.Errorf("%s: insert step: %w", op, err)

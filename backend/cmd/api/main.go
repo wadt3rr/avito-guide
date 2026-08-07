@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/wadt3rr/avito-guide/backend/internal/config"
@@ -48,7 +49,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              cfg.HTTPServer.Address,
-		Handler:           newRouter(storageDB, log),
+		Handler:           withCORS(newRouter(storageDB, log), cfg.HTTPServer.CORSAllowedOrigins),
 		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
 		ReadTimeout:       cfg.HTTPServer.Timeout,
 		WriteTimeout:      cfg.HTTPServer.Timeout,
@@ -163,6 +164,22 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 	})
 
 	return r
+}
+
+func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
+	return cors.Handler(cors.Options{
+		AllowedOrigins: allowedOrigins,
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowedHeaders: []string{"Accept", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	})(next)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
