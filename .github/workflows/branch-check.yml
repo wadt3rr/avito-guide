@@ -36,6 +36,7 @@ jobs:
         with:
           version: latest
           working-directory: ./backend
+          install-mode: goinstall
 
       - name: Run tests
         run: go test -v ./...
