@@ -16,7 +16,10 @@
   }
 
   &__content {
-    width: min(100%, 1180px);
+    width: min(100%, 1680px);
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
     padding: 38px 36px 72px;
     margin: 0 auto;
 
@@ -30,6 +33,7 @@
   }
 
   &__back {
+    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -102,6 +106,11 @@
       background: currentColor;
       border-radius: 50%;
     }
+
+    &--published {
+      color: #008f62;
+      background: #e8f7f1;
+    }
   }
 
   &__subtitle {
@@ -109,6 +118,34 @@
     margin: 8px 0 0;
     color: tokens.$color-ink-soft;
     font: 400 14px/22px tokens.$font-ui;
+  }
+
+  &__notice {
+    margin: 10px 0 0;
+    color: #008f62;
+    font: 600 13px/18px tokens.$font-ui;
+  }
+
+  &__error {
+    margin: 10px 0 0;
+    color: #e32636;
+    font: 600 13px/18px tokens.$font-ui;
+  }
+
+  &__state {
+    padding: 48px 36px;
+    margin: 0;
+    color: tokens.$color-ink-soft;
+    font: 400 14px/22px tokens.$font-ui;
+
+    p {
+      margin: 0 0 12px;
+    }
+  }
+
+  &__state-actions {
+    display: flex;
+    gap: 8px;
   }
 
   &__actions {
@@ -132,6 +169,13 @@
     display: flex;
     flex-direction: column;
     gap: 72px;
+  }
+
+  &__delete-action {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 64px;
+    margin-top: auto;
   }
 
   @media (max-width: 860px) {

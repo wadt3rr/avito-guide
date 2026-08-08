@@ -55,10 +55,10 @@
 
   &--danger {
     color: #ff4053;
-    background: transparent;
+    background: #ffe1e1;
 
     &:hover:not(:disabled) {
-      background: #ffebed;
+      background: #fbbdc7;
     }
 
     &:active:not(:disabled) {

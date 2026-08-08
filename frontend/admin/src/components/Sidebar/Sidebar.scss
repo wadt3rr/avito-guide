@@ -33,10 +33,14 @@
     align-items: center;
     gap: 12px;
     padding: 8px 12px;
+    width: 100%;
     color: tokens.$color-ink-soft;
+    background: transparent;
+    border: 0;
     border-radius: tokens.$radius-control;
     font: 600 14px/20px tokens.$font-ui;
     text-decoration: none;
+    text-align: left;
     transition:
       color 150ms ease,
       background-color 150ms ease;
@@ -48,6 +52,15 @@
     &:hover {
       color: tokens.$color-ink;
       background: tokens.$color-surface-muted;
+    }
+
+    &:disabled {
+      cursor: default;
+
+      &:hover {
+        color: tokens.$color-ink-soft;
+        background: transparent;
+      }
     }
 
     &:focus-visible {

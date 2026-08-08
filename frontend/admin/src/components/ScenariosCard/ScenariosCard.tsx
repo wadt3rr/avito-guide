@@ -1,10 +1,11 @@
+import { useNavigate } from 'react-router-dom'
+import type { ScenarioStatus } from '../../data/scenarios'
 import { Button } from '../Button/Button'
 import { Icon } from '../Icon/Icon'
 import './ScenariosCard.scss'
 
-export type ScenarioStatus = 'published' | 'draft'
-
-export type ScenariosCardProps = {
+export interface IScenariosCard {
+  id: string
   title: string
   status: ScenarioStatus
   steps: number
@@ -38,11 +39,15 @@ function formatSteps(steps: number) {
 
 export function ScenariosCard({
   canOpen = false,
+  id,
   path,
   status,
   steps,
   title,
-}: ScenariosCardProps) {
+}: IScenariosCard) {
+  const navigate = useNavigate()
+  const openScenario = () => navigate(`/scenarios/${id}`)
+
   return (
     <article className="scenarios-card">
       <div className="scenarios-card__header">
@@ -68,8 +73,12 @@ export function ScenariosCard({
 
       <div className="scenarios-card__footer">
         <div className="scenarios-card__actions">
-          {canOpen && <Button variant="secondary">Открыть</Button>}
-          <Button>Редактировать</Button>
+          {canOpen && (
+            <Button onClick={openScenario} variant="secondary">
+              Открыть
+            </Button>
+          )}
+          <Button onClick={openScenario}>Редактировать</Button>
         </div>
       </div>
     </article>

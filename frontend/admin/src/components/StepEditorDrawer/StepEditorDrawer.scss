@@ -77,58 +77,6 @@
     overflow-y: auto;
   }
 
-  &__targets {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-  }
-
-  &__target {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 11px 12px;
-    color: tokens.$color-ink-soft;
-    background: tokens.$color-surface-muted;
-    border: 0;
-    border-radius: 9px;
-    font: 600 12.5px/18px tokens.$font-ui;
-    text-align: left;
-    cursor: pointer;
-
-    code {
-      flex: 0 0 auto;
-      color: tokens.$color-ink-faint;
-      font: 500 11px/16px ui-monospace, monospace;
-    }
-
-    &:hover {
-      color: tokens.$color-ink;
-      background: tokens.$color-surface-hover;
-    }
-
-    &:focus-visible {
-      @include mixins.focus-ring;
-    }
-
-    &--selected {
-      color: tokens.$color-accent;
-      background: rgb(0 144 222 / 10%);
-
-      code {
-        color: tokens.$color-accent;
-      }
-    }
-  }
-
-  &__field-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
   &__footer {
     align-items: center;
   }
@@ -143,9 +91,6 @@
       padding-inline: 16px;
     }
 
-    &__field-row {
-      grid-template-columns: 1fr;
-    }
   }
 }
 
@@ -182,11 +127,57 @@
       min-height: 104px;
       resize: vertical;
     }
+
+    &--code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+  }
+
+  &__attribute {
+    width: 100%;
+    min-height: 44px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    overflow: hidden;
+    color: tokens.$color-ink;
+    background: tokens.$color-surface-muted;
+    border-radius: 10px;
+
+    strong {
+      padding: 12px 0 12px 13px;
+      font: 600 13px/20px ui-monospace, SFMono-Regular, Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    input {
+      min-width: 0;
+      min-height: 44px;
+      padding: 12px 13px 12px 4px;
+      color: tokens.$color-ink;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      font: 400 13.5px/20px ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    &:hover {
+      background: tokens.$color-surface-hover;
+    }
+
+    &:focus-within {
+      background: tokens.$color-surface;
+      @include mixins.focus-ring;
+    }
   }
 
   &__hint {
     color: tokens.$color-ink-faint;
     font: 500 11.5px/16px tokens.$font-ui;
+
+    &--code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
   }
 }
 

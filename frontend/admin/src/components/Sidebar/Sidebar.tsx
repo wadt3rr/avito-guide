@@ -1,51 +1,44 @@
-import { Button } from '../Button/Button'
-import { Icon, type IconName } from '../Icon/Icon'
+import {NavLink} from 'react-router-dom'
+import {Icon, type IconName} from '../Icon/Icon'
 import './Sidebar.scss'
 
-type NavigationItem = {
-  label: string
-  icon: IconName
-  active?: boolean
+interface INavigationItem {
+    label: string
+    icon: IconName
+    path?: string
 }
 
-const navigationItems: NavigationItem[] = [
-  { label: 'Аналитика', icon: 'analytics' },
-  { label: 'Сценарии', icon: 'scenarios', active: true },
-  { label: 'Настройки', icon: 'settings' },
+const navigationItems: INavigationItem[] = [
+    {label: 'Аналитика', icon: 'analytics', path: '/analytics'},
+    {label: 'Сценарии', icon: 'scenarios', path: '/scenarios'},
 ]
 
 export function Sidebar() {
-  return (
-    <aside className="sidebar">
-      <div className="sidebar__brand">Avito Tipper</div>
+    return (
+        <aside className="sidebar">
+            <div className="sidebar__brand">Avito Tipper</div>
 
-      <nav aria-label="Основная навигация" className="sidebar__navigation">
-        {navigationItems.map(({ active, icon, label }) => (
-          <a
-            aria-current={active ? 'page' : undefined}
-            className={`sidebar__link${active ? ' sidebar__link--active' : ''}`}
-            href="#"
-            key={label}
-          >
-            <Icon name={icon} size={20} />
-            <span>{label}</span>
-          </a>
-        ))}
-      </nav>
-
-      <div className="sidebar__footer">
-        <Button
-          className="sidebar__create-button"
-          leadingIcon={<Icon name="add" size={18} />}
-        >
-          Новый сценарий
-        </Button>
-
-        <a className="sidebar__link" href="#">
-          <Icon name="logout" size={18} />
-          <span>Выйти</span>
-        </a>
-      </div>
-    </aside>
-  )
+            <nav aria-label="Основная навигация" className="sidebar__navigation">
+                {navigationItems.map(({icon, label, path}) =>
+                    path ? (
+                        <NavLink
+                            className={({isActive}) =>
+                                `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
+                            }
+                            key={label}
+                            to={path}
+                        >
+                            <Icon name={icon} size={20}/>
+                            <span>{label}</span>
+                        </NavLink>
+                    ) : (
+                        <button className="sidebar__link" disabled key={label} type="button">
+                            <Icon name={icon} size={20}/>
+                            <span>{label}</span>
+                        </button>
+                    ),
+                )}
+            </nav>
+        </aside>
+    )
 }

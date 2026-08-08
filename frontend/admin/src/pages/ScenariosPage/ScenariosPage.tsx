@@ -1,83 +1,105 @@
-import { Button } from '../../components/Button/Button'
-import { CreateScenarioCard } from '../../components/CreateScenarioCard/CreateScenarioCard'
-import { Icon } from '../../components/Icon/Icon'
-import {
-  ScenariosCard,
-  type ScenariosCardProps,
-} from '../../components/ScenariosCard/ScenariosCard'
-import { Sidebar } from '../../components/Sidebar/Sidebar'
+import {useEffect, useState} from 'react'
+import {useNavigate} from 'react-router-dom'
+import {getScenarios} from '../../api/scenarios'
+import {Button} from '../../components/Button/Button'
+import {CreateScenarioCard} from '../../components/CreateScenarioCard/CreateScenarioCard'
+import {Icon} from '../../components/Icon/Icon'
+import {ScenariosCard} from '../../components/ScenariosCard/ScenariosCard'
+import {Sidebar} from '../../components/Sidebar/Sidebar'
+import type {IScenario} from '../../data/scenarios'
 import './ScenariosPage.scss'
 
-const scenarios = [
-  {
-    title: 'Первое объявление',
-    status: 'published',
-    steps: 4,
-    path: '/create',
-    canOpen: true,
-  },
-  {
-    title: 'Настройка профиля продавца',
-    status: 'draft',
-    steps: 7,
-    path: '/profile/edit',
-  },
-  {
-    title: 'Тур по премиум-функциям',
-    status: 'published',
-    steps: 3,
-    path: '/premium',
-    canOpen: true,
-  },
-] satisfies ScenariosCardProps[]
-
-const topNavigation = ['Все сценарии', 'Шаблоны', 'Архив']
-
 export function ScenariosPage() {
-  return (
-    <div className="scenarios-page">
-      <Sidebar />
+    const navigate = useNavigate()
+    const [scenarios, setScenarios] = useState<IScenario[]>([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState('')
 
-      <main className="scenarios-page__main">
-        <header className="topbar">
-          <nav aria-label="Разделы сценариев" className="topbar__navigation">
-            {topNavigation.map((label, index) => (
-              <a
-                aria-current={index === 0 ? 'page' : undefined}
-                className={`topbar__link${index === 0 ? ' topbar__link--active' : ''}`}
-                href="#"
-                key={label}
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
+    useEffect(() => {
+        let cancelled = false
 
-          <button aria-label="Поиск" className="topbar__search" type="button">
-            <Icon name="search" size={22} />
-          </button>
-        </header>
+        void getScenarios()
+            .then((loadedScenarios) => {
+                if (!cancelled) setScenarios(loadedScenarios)
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setError('Не удалось загрузить сценарии. Проверьте, что API запущено.')
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoading(false)
+            })
 
-        <div className="scenarios-page__content">
-          <div className="scenarios-page__heading-row">
-            <h1 className="scenarios-page__title">Сценарии</h1>
-            <Button
-              className="scenarios-page__create-button"
-              leadingIcon={<Icon name="add" size={18} />}
-            >
-              Создать сценарий
-            </Button>
-          </div>
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
-          <section aria-label="Список сценариев" className="scenarios-grid">
-            {scenarios.map((scenario) => (
-              <ScenariosCard key={scenario.title} {...scenario} />
-            ))}
+    const retryLoadScenarios = async () => {
+        setIsLoading(true)
+        setError('')
 
-            <CreateScenarioCard />
-          </section>
+        try {
+            setScenarios(await getScenarios())
+        } catch {
+            setError('Не удалось загрузить сценарии. Проверьте, что API запущено.')
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    return (
+        <div className="scenarios-page">
+            <Sidebar/>
+
+            <main className="scenarios-page__main">
+                <div className="scenarios-page__content">
+                    <div className="scenarios-page__heading-row">
+                        <h1 className="scenarios-page__title">Сценарии</h1>
+                        <Button
+                            className="scenarios-page__create-button"
+                            leadingIcon={<Icon name="add" size={18}/>}
+                            onClick={() => navigate('/scenarios/new')}
+                        >
+                            Создать сценарий
+                        </Button>
+                    </div>
+
+                    {isLoading && (
+                        <p className="scenarios-page__state" role="status">
+                            Загружаем сценарии…
+                        </p>
+                    )}
+
+                    {error && (
+                        <div className="scenarios-page__error" role="alert">
+                            <p>{error}</p>
+                            <Button onClick={() => void retryLoadScenarios()} variant="secondary">
+                                Повторить
+                            </Button>
+                        </div>
+                    )}
+
+                    {!isLoading && !error && (
+                    <section aria-label="Список сценариев" className="scenarios-grid">
+                        {scenarios.map((scenario) => (
+                            <ScenariosCard
+                                canOpen={scenario.canOpen}
+                                id={scenario.id}
+                                key={scenario.id}
+                                path={scenario.path}
+                                status={scenario.status}
+                                steps={scenario.steps.length}
+                                title={scenario.title}
+                            />
+                        ))}
+
+                        <CreateScenarioCard/>
+                    </section>
+                    )}
+                </div>
+            </main>
         </div>
-      </main>
-    </div>
-  )
+    )
 }

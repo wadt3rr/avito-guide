@@ -1,6 +1,18 @@
 import './ScenarioDetailsForm.scss'
 
-export function ScenarioDetailsForm() {
+interface IScenarioDetailsForm {
+  description: string
+  path: string
+  title: string
+  onChange: (field: 'description' | 'path' | 'title', value: string) => void
+}
+
+export function ScenarioDetailsForm({
+  description,
+  onChange,
+  path,
+  title,
+}: IScenarioDetailsForm) {
   return (
     <section className="scenario-details" aria-labelledby="scenario-details-title">
       <div className="scenario-details__heading">
@@ -12,31 +24,37 @@ export function ScenarioDetailsForm() {
         <label className="scenario-field">
           <span className="scenario-field__label">Название сценария</span>
           <input
+            autoComplete="off"
             className="scenario-field__control"
-            defaultValue="Как разместить первое объявление"
+            onChange={(event) => onChange('title', event.target.value)}
+            placeholder="Введите название"
             type="text"
+            value={title}
           />
         </label>
 
         <label className="scenario-field">
           <span className="scenario-field__label">Описание</span>
           <textarea
+            autoComplete="off"
             className="scenario-field__control scenario-field__control--textarea"
-            defaultValue="Помогает пользователю создать первое объявление"
+            onChange={(event) => onChange('description', event.target.value)}
+            placeholder="Кратко опишите сценарий"
             rows={4}
+            value={description}
           />
         </label>
 
         <label className="scenario-field">
           <span className="scenario-field__label">Страница запуска</span>
           <input
+            autoComplete="off"
             className="scenario-field__control"
-            defaultValue="/create"
+            onChange={(event) => onChange('path', event.target.value)}
+            placeholder="/path"
             type="text"
+            value={path}
           />
-          <span className="scenario-field__hint">
-            Путь, на котором сценарий стартует автоматически
-          </span>
         </label>
       </div>
     </section>

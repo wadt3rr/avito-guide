@@ -3,7 +3,7 @@ import './Button.scss'
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger'
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+export interface IButton extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
   leadingIcon?: ReactNode
 }
@@ -15,7 +15,7 @@ export function Button({
   type = 'button',
   variant = 'primary',
   ...props
-}: ButtonProps) {
+}: IButton) {
   const classes = ['button', `button--${variant}`, className]
     .filter(Boolean)
     .join(' ')
