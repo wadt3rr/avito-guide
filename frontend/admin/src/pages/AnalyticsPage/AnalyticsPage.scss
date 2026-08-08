@@ -1,0 +1,42 @@
+@use '../../styles/tokens' as tokens;
+
+.analytics-page {
+  min-height: 100svh;
+  color: tokens.$color-ink;
+  background: tokens.$color-canvas;
+
+  &__main {
+    min-height: 100svh;
+    margin-left: tokens.$sidebar-width;
+
+    @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+      margin-left: 0;
+    }
+  }
+
+  &__content {
+    width: min(100%, tokens.$content-max-width);
+    padding: 48px 36px;
+
+    @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+      padding: 32px 24px;
+    }
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      padding: 28px 16px;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    font: 700 26px/32px tokens.$font-heading;
+    letter-spacing: -0.02em;
+  }
+
+  &__description {
+    max-width: 520px;
+    margin: 12px 0 0;
+    color: tokens.$color-ink-soft;
+    font: 400 14px/22px tokens.$font-ui;
+  }
+}

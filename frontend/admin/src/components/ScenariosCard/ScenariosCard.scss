@@ -1,0 +1,109 @@
+@use '../../styles/tokens' as tokens;
+
+.scenarios-card {
+  min-width: 0;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background: tokens.$color-surface;
+  border: 1px solid transparent;
+  border-radius: tokens.$radius-card;
+  box-shadow: tokens.$shadow-card;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: tokens.$shadow-card-hover;
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  &__title {
+    min-width: 0;
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    color: tokens.$color-ink;
+    font: 700 15.5px/20px tokens.$font-ui;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  &__status {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font: 600 11.5px/14px tokens.$font-ui;
+    white-space: nowrap;
+
+    &--published {
+      color: tokens.$color-success;
+      background: tokens.$color-success-surface;
+    }
+
+    &--draft {
+      color: tokens.$color-warning;
+      background: tokens.$color-warning-surface;
+    }
+  }
+
+  &__status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &__metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  &__chip {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    overflow: hidden;
+    color: tokens.$color-ink-soft;
+    background: tokens.$color-surface-muted;
+    border-radius: 4px;
+    font: 500 11.5px/14px tokens.$font-ui;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    svg {
+      flex: 0 0 auto;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 16px;
+    margin-top: auto;
+    border-top: 1px solid tokens.$color-border;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+}

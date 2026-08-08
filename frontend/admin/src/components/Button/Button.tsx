@@ -1,0 +1,29 @@
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import './Button.scss'
+
+type ButtonVariant = 'primary' | 'secondary' | 'danger'
+
+export interface IButton extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant
+  leadingIcon?: ReactNode
+}
+
+export function Button({
+  children,
+  className = '',
+  leadingIcon,
+  type = 'button',
+  variant = 'primary',
+  ...props
+}: IButton) {
+  const classes = ['button', `button--${variant}`, className]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <button className={classes} type={type} {...props}>
+      {leadingIcon && <span className="button__icon">{leadingIcon}</span>}
+      <span className="button__label">{children}</span>
+    </button>
+  )
+}

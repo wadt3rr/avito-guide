@@ -1,0 +1,12 @@
+@use './tokens' as tokens;
+
+@mixin focus-ring {
+  outline: 3px solid rgb(0 144 222 / 24%);
+  outline-offset: 2px;
+}
+
+@mixin desktop-only {
+  @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+    display: none;
+  }
+}
