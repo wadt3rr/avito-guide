@@ -1,22 +1,21 @@
 import { Analytics } from './analytics';
-import { getAnonId, getSessionId } from './progress';
+import { watchPathname } from './navigation';
+import { getSessionId } from './progress';
 import { Runner } from './runner';
 import { createSource } from './source';
-import type { ResolveContext, WidgetConfig } from './types';
+import type { ResolveContext, Scenario, WidgetConfig } from './types';
 
 /**
  * Точка входа. Сайт подключает виджет одной строкой:
  *
  *   <script src=".../widget.js" data-api="http://localhost:8081"></script>
  *
- * Ничего импортировать и вызывать не требуется. Страница может дополнительно
- * сообщить о себе факты — сегмент, вертикаль, стадию сделки — через
- * window.AvitoOnboarding.identify(); без них работают сценарии,
- * которым достаточно адреса страницы.
+ * Ничего импортировать и вызывать не требуется. Для выбора сценария виджет
+ * использует только pathname текущей страницы.
  */
 
 interface PublicApi {
-  identify(facts: Record<string, string>): void;
+  preview(scenario: Scenario): Promise<void>;
   start(): Promise<void>;
 }
 
@@ -32,44 +31,59 @@ function readConfig(): WidgetConfig {
 
   return {
     apiUrl: script?.dataset.api?.replace(/\/$/, '') || null,
-    previewId: params.get('onboarding_preview'),
     debug: script?.dataset.debug === 'true' || params.has('onboarding_debug'),
   };
 }
 
 const config = readConfig();
-const facts: Record<string, string> = {};
 
 const analytics = new Analytics(config, {
-  anonId: getAnonId(),
   sessionId: getSessionId(),
 });
+const source = createSource(config);
 
 let running: Runner | null = null;
+let startVersion = 0;
 
 async function start(): Promise<void> {
   if (running) return;
+  const version = ++startVersion;
+  const pathname = location.pathname;
 
-  const context: ResolveContext = {
-    url: location.pathname,
-    anon_id: getAnonId(),
-    session_id: getSessionId(),
-    context: facts,
-  };
+  const context: ResolveContext = { path: pathname };
 
-  const scenario = await createSource(config).resolve(context);
+  const scenario = await source.resolve(context);
+  if (version !== startVersion || pathname !== location.pathname) return;
   if (!scenario || scenario.steps.length === 0) return;
 
   running = new Runner(scenario, analytics);
   await running.start();
 }
 
+function restart(): void {
+  startVersion += 1;
+  running?.stop();
+  running = null;
+  void start();
+}
+
+async function preview(scenario: Scenario): Promise<void> {
+  startVersion += 1;
+  running?.stop();
+  running = null;
+
+  if (scenario.steps.length === 0) return;
+
+  running = new Runner(scenario, analytics, { mode: 'preview' });
+  await running.start();
+}
+
 window.AvitoOnboarding = {
-  identify(next) {
-    Object.assign(facts, next);
-  },
+  preview,
   start,
 };
+
+watchPathname(restart);
 
 // Дожидаемся готовности разметки: до неё искать цели бессмысленно.
 if (document.readyState === 'loading') {

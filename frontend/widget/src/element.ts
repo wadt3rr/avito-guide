@@ -82,7 +82,8 @@ export function resolveTarget(
 
 /** Как долго ждём остановки прокрутки, прежде чем показать подсказку всё равно. */
 const SCROLL_SETTLE_TIMEOUT_MS = 700;
-const SCROLL_POLL_MS = 60;
+const SCROLL_POLL_MS = 32;
+const SCROLL_POSITION_EPSILON_PX = 0.5;
 
 /**
  * Прокручивает цель в зону видимости и ждёт, пока прокрутка успокоится.
@@ -125,7 +126,7 @@ export function scrollIntoView(el: HTMLElement): Promise<void> {
 
     const timer = setInterval(() => {
       const top = el.getBoundingClientRect().top;
-      stable = top === lastTop ? stable + 1 : 0;
+      stable = Math.abs(top - lastTop) <= SCROLL_POSITION_EPSILON_PX ? stable + 1 : 0;
       lastTop = top;
 
       if (stable >= 2 || Date.now() - startedAt > SCROLL_SETTLE_TIMEOUT_MS) finish();

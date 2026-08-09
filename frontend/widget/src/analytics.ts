@@ -1,4 +1,9 @@
-import type { EventType, OnboardingEvent, WidgetConfig } from './types';
+import type {
+  BackendAnalyticsEvent,
+  BackendEventType,
+  EventType,
+  WidgetConfig,
+} from './types';
 
 /**
  * Отправка событий прохождения.
@@ -12,12 +17,19 @@ import type { EventType, OnboardingEvent, WidgetConfig } from './types';
 const FLUSH_INTERVAL_MS = 3000;
 
 export interface TrackerIdentity {
-  anonId: string;
   sessionId: string;
 }
 
+const BACKEND_EVENT_TYPES: Partial<Record<EventType, BackendEventType>> = {
+  scenario_started: 'started',
+  step_completed: 'step_completed',
+  step_skipped: 'skipped',
+  scenario_dismissed: 'skipped',
+  scenario_finished: 'finished',
+};
+
 export class Analytics {
-  private queue: OnboardingEvent[] = [];
+  private queue: BackendAnalyticsEvent[] = [];
   private timer: number | undefined;
 
   constructor(
@@ -37,20 +49,19 @@ export class Analytics {
     stepId: string | null,
     meta?: Record<string, unknown>,
   ): void {
-    const event: OnboardingEvent = {
-      type,
-      scenario_id: scenarioId,
-      step_id: stepId,
-      anon_id: this.identity.anonId,
-      session_id: this.identity.sessionId,
-      url: location.pathname,
-      created_at: new Date().toISOString(),
-      ...(meta ? { meta } : {}),
-    };
-
     if (this.config.debug) {
       console.info('[onboarding]', type, meta ?? '');
     }
+
+    const eventType = BACKEND_EVENT_TYPES[type];
+    if (!eventType) return;
+
+    const event: BackendAnalyticsEvent = {
+      scenario_id: scenarioId,
+      session_id: this.identity.sessionId,
+      ...(stepId ? { step_id: stepId } : {}),
+      event_type: eventType,
+    };
 
     this.queue.push(event);
     this.schedule();
@@ -72,25 +83,28 @@ export class Analytics {
   private flush(): void {
     if (this.queue.length === 0) return;
 
-    const batch = this.queue;
+    const events = this.queue;
     this.queue = [];
 
     if (!this.config.apiUrl) return;
 
-    const url = `${this.config.apiUrl}/api/v1/embed/events`;
-    const body = JSON.stringify(batch);
+    const url = `${this.config.apiUrl}/api/v1/analytics/events`;
 
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
-      return;
+    for (const event of events) {
+      const body = JSON.stringify(event);
+      const sent = navigator.sendBeacon?.(
+        url,
+        new Blob([body], { type: 'application/json' }),
+      );
+      if (sent) continue;
+
+      // Аналитика никогда не должна ронять хост-приложение.
+      void fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => undefined);
     }
-
-    // Аналитика никогда не должна ронять хост-приложение.
-    void fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      keepalive: true,
-    }).catch(() => undefined);
   }
 }

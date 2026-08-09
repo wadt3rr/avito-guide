@@ -1,7 +1,8 @@
 import type { Analytics } from './analytics';
 import { resolveTarget, scrollIntoView } from './element';
 import { getProgress, saveProgress } from './progress';
-import type { Scenario } from './types';
+import { normalizeScenarioType } from './scenario-type';
+import type { Scenario, ScenarioType, Step } from './types';
 import { Ui } from './ui';
 
 /**
@@ -14,26 +15,36 @@ import { Ui } from './ui';
  */
 type State = 'idle' | 'resolving' | 'showing' | 'finished' | 'aborted';
 
+export interface RunnerOptions {
+  mode?: 'live' | 'preview';
+}
+
 export class Runner {
   private state: State = 'idle';
   private index = 0;
   private ui: Ui | null = null;
   private pending: AbortController | null = null;
+  private readonly type: ScenarioType;
+  private readonly isPreview: boolean;
 
   constructor(
     private readonly scenario: Scenario,
     private readonly analytics: Analytics,
+    options: RunnerOptions = {},
   ) {
+    this.type = normalizeScenarioType(scenario.type);
+    this.isPreview = options.mode === 'preview';
     this.onKeyDown = this.onKeyDown.bind(this);
   }
 
   async start(): Promise<void> {
     if (this.state !== 'idle') return;
 
-    const saved = getProgress(this.scenario.id);
+    const saved = this.isPreview ? null : getProgress(this.scenario.id);
     if (saved?.finished) return;
 
-    this.index = Math.min(saved?.step ?? 0, this.scenario.steps.length - 1);
+    this.index =
+      this.type === 'tooltip' ? Math.min(saved?.step ?? 0, this.scenario.steps.length - 1) : 0;
 
     this.ui = new Ui({
       onNext: () => void this.advance('step_completed'),
@@ -43,11 +54,17 @@ export class Runner {
     });
     document.addEventListener('keydown', this.onKeyDown);
 
-    this.analytics.track('scenario_started', this.scenario.id, null, {
+    this.track('scenario_started', null, {
       resumed_at_step: this.index,
     });
 
     await this.enter(this.index);
+  }
+
+  /** Stops rendering because the host page changed, without treating it as a user dismissal. */
+  stop(): void {
+    if (this.state === 'finished' || this.state === 'aborted') return;
+    this.teardown('aborted');
   }
 
   /** Показывает шаг. Если цель не нашлась — честно сообщает и идёт дальше. */
@@ -57,13 +74,19 @@ export class Runner {
     const step = this.scenario.steps[index];
     if (!step) return this.finish();
 
+    if (this.type !== 'tooltip') {
+      this.showStandalone(step);
+      return;
+    }
+
+    if (this.state === 'showing') this.ui?.prepareForTransition();
     this.pending?.abort();
     this.pending = new AbortController();
     this.state = 'resolving';
     this.index = index;
 
     const target = await resolveTarget(
-      step.selector,
+      step.selector ?? '',
       step.timeout_sec * 1000,
       this.pending.signal,
     );
@@ -72,8 +95,8 @@ export class Runner {
 
     if (!target) {
       // Единственный сигнал команде, что сценарий сломан вёрсткой.
-      this.analytics.track('step_failed', this.scenario.id, step.id, {
-        selector: step.selector,
+      this.track('step_failed', step.id, {
+        selector: step.selector ?? '',
         reason: 'target_not_found',
       });
       return this.skipUnresolvable(index);
@@ -83,11 +106,12 @@ export class Runner {
     if (this.pending.signal.aborted) return;
 
     this.state = 'showing';
-    saveProgress(this.scenario.id, index);
-    this.analytics.track('step_shown', this.scenario.id, step.id);
+    this.saveProgress(index);
+    this.track('step_shown', step.id);
 
     this.ui?.render(
       {
+        type: this.type,
         step,
         index,
         total: this.scenario.steps.length,
@@ -97,10 +121,24 @@ export class Runner {
     );
   }
 
+  private showStandalone(step: Step): void {
+    this.state = 'showing';
+    this.index = 0;
+    this.saveProgress(0);
+    this.track('step_shown', step.id);
+    this.ui?.render({
+      type: this.type,
+      step,
+      index: 0,
+      total: 1,
+      canGoBack: false,
+    });
+  }
+
   /** Ни один шаг не нашёлся до конца сценария — показывать больше нечего. */
   private async skipUnresolvable(index: number): Promise<void> {
     if (index + 1 >= this.scenario.steps.length) {
-      this.analytics.track('scenario_dismissed', this.scenario.id, null, {
+      this.track('scenario_dismissed', null, {
         reason: 'no_resolvable_steps',
       });
       return this.teardown('aborted');
@@ -112,9 +150,11 @@ export class Runner {
     if (this.state !== 'showing') return;
 
     const step = this.scenario.steps[this.index];
-    if (step) this.analytics.track(reason, this.scenario.id, step.id);
+    if (step) this.track(reason, step.id);
 
-    if (this.index + 1 >= this.scenario.steps.length) return this.finish();
+    if (this.type !== 'tooltip' || this.index + 1 >= this.scenario.steps.length) {
+      return this.finish();
+    }
     await this.enter(this.index + 1);
   }
 
@@ -124,8 +164,8 @@ export class Runner {
   }
 
   private finish(): void {
-    this.analytics.track('scenario_finished', this.scenario.id, null);
-    saveProgress(this.scenario.id, this.scenario.steps.length, true);
+    this.track('scenario_finished', null);
+    this.saveProgress(this.scenario.steps.length, true);
     this.teardown('finished');
   }
 
@@ -133,7 +173,7 @@ export class Runner {
     if (this.state === 'finished' || this.state === 'aborted') return;
 
     const step = this.scenario.steps[this.index];
-    this.analytics.track('scenario_dismissed', this.scenario.id, step?.id ?? null, {
+    this.track('scenario_dismissed', step?.id ?? null, {
       at_step: this.index,
     });
     this.teardown('aborted');
@@ -149,5 +189,19 @@ export class Runner {
 
   private onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') this.dismiss();
+  }
+
+  private track(
+    type: Parameters<Analytics['track']>[0],
+    stepId: string | null,
+    meta?: Record<string, unknown>,
+  ): void {
+    if (this.isPreview) return;
+    this.analytics.track(type, this.scenario.id, stepId, meta);
+  }
+
+  private saveProgress(step: number, finished = false): void {
+    if (this.isPreview) return;
+    saveProgress(this.scenario.id, step, finished);
   }
 }

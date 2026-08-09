@@ -3,9 +3,9 @@ import type { ResolveContext, Scenario, WidgetConfig } from './types';
 /**
  * Откуда берётся сценарий.
  *
- * Единственный модуль, знающий про сеть. Пока бэкенд не отдаёт эндпоинты
- * виджета, работает встроенный сценарий-мок; переключение — по наличию
- * адреса API в настройках, ни один другой модуль об этом не знает.
+ * Пока backend не умеет выбирать опубликованный сценарий по path, виджет
+ * работает на встроенных сценариях-моках. Адрес API уже можно указывать:
+ * он используется отдельным модулем аналитики.
  */
 
 export interface ScenarioSource {
@@ -15,6 +15,7 @@ export interface ScenarioSource {
 /** Демонстрационный сценарий подачи объявления. Селекторы — из реестра якорей демо-сайта. */
 const MOCK_SCENARIO: Scenario = {
   id: '00000000-0000-4000-8000-000000000001',
+  type: 'tooltip',
   title: 'Первое объявление',
   steps: [
     {
@@ -51,7 +52,8 @@ const MOCK_SCENARIO: Scenario = {
       id: 'step-submit',
       step_order: 4,
       title: 'Готово, публикуем',
-      content: 'После публикации объявление пройдёт проверку — обычно это занимает несколько минут.',
+      content:
+        'После публикации объявление пройдёт проверку — обычно это занимает несколько минут.',
       selector: '[data-onboarding-id="form-submit"]',
       action_type: 'next',
       timeout_sec: 5,
@@ -59,41 +61,51 @@ const MOCK_SCENARIO: Scenario = {
   ],
 };
 
+const MOCK_MODAL: Scenario = {
+  id: '00000000-0000-4000-8000-000000000002',
+  type: 'modal',
+  title: 'Объявление можно улучшить',
+  steps: [
+    {
+      id: 'modal-listing-tip',
+      step_order: 1,
+      title: 'Объявление можно улучшить',
+      content:
+        'Добавьте больше фотографий и уточните название — так покупателям будет проще найти ваше предложение.',
+      action_type: 'next',
+      timeout_sec: 0,
+    },
+  ],
+};
+
+const MOCK_BANNER: Scenario = {
+  id: '00000000-0000-4000-8000-000000000003',
+  type: 'banner',
+  title: 'Не забудьте передать заказ',
+  steps: [
+    {
+      id: 'banner-order-reminder',
+      step_order: 1,
+      title: 'Не забудьте передать заказ',
+      content: 'Отнесите посылку в пункт выдачи до завтра, чтобы заказ не отменился.',
+      action_type: 'next',
+      timeout_sec: 0,
+    },
+  ],
+};
+
 class MockSource implements ScenarioSource {
   resolve(context: ResolveContext): Promise<Scenario | null> {
-    return Promise.resolve(context.url.startsWith('/create') ? MOCK_SCENARIO : null);
-  }
-}
-
-class HttpSource implements ScenarioSource {
-  constructor(private readonly config: WidgetConfig) {}
-
-  async resolve(context: ResolveContext): Promise<Scenario | null> {
-    const base = this.config.apiUrl;
-    if (!base) return null;
-
-    try {
-      const response = this.config.previewId
-        ? await fetch(
-            `${base}/api/v1/embed/scenario/${this.config.previewId}?preview=1`,
-            { headers: { Accept: 'application/json' } },
-          )
-        : await fetch(`${base}/api/v1/embed/resolve`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(context),
-          });
-
-      // 204 — подходящего сценария нет, это нормальный ответ, а не ошибка.
-      if (response.status === 204 || !response.ok) return null;
-      return (await response.json()) as Scenario;
-    } catch {
-      // Сеть недоступна — сайт должен продолжать работать как ни в чём не бывало.
-      return null;
-    }
+    if (context.path.startsWith('/create')) return Promise.resolve(MOCK_SCENARIO);
+    if (context.path.startsWith('/my')) return Promise.resolve(MOCK_MODAL);
+    if (context.path.startsWith('/orders')) return Promise.resolve(MOCK_BANNER);
+    return Promise.resolve(null);
   }
 }
 
 export function createSource(config: WidgetConfig): ScenarioSource {
-  return config.apiUrl ? new HttpSource(config) : new MockSource();
+  // Backend пока не умеет находить опубликованный сценарий по path.
+  // data-api используется аналитикой, а сценарии до появления resolve endpoint остаются локальными.
+  void config;
+  return new MockSource();
 }
