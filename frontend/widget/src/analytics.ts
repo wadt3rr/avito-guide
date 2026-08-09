@@ -1,14 +1,21 @@
-import type { EventType, OnboardingEvent, WidgetConfig } from './types';
+import type {BackendAnalyticsEvent, BackendEventType, EventType, WidgetConfig} from './types';
 
 const FLUSH_INTERVAL_MS = 3000;
 
 export interface TrackerIdentity {
-  anonId: string;
   sessionId: string;
 }
 
+const BACKEND_EVENT_TYPES: Partial<Record<EventType, BackendEventType>> = {
+  scenario_started: 'started',
+  step_completed: 'step_completed',
+  step_skipped: 'skipped',
+  scenario_dismissed: 'skipped',
+  scenario_finished: 'finished',
+};
+
 export class Analytics {
-  private queue: OnboardingEvent[] = [];
+  private queue: BackendAnalyticsEvent[] = [];
   private timer: number | undefined;
 
   constructor(
@@ -22,25 +29,18 @@ export class Analytics {
     });
   }
 
-  track(
-    type: EventType,
-    scenarioId: string,
-    stepId: string | null,
-    meta?: Record<string, unknown>,
-  ): void {
-    const event: OnboardingEvent = {
-      event_type: type,
+  track(type: EventType, scenarioId: string, stepId: string | null, meta?: Record<string, unknown>): void {
+    if (this.config.debug) console.info('[onboarding]', type, meta ?? '');
+
+    const eventType = BACKEND_EVENT_TYPES[type];
+    if (!eventType) return;
+
+    this.queue.push({
       scenario_id: scenarioId,
-      step_id: stepId,
-      anon_id: this.identity.anonId,
       session_id: this.identity.sessionId,
-    };
-
-    if (this.config.debug) {
-      console.info('[onboarding]', type, meta ?? '');
-    }
-
-    this.queue.push(event);
+      ...(stepId ? {step_id: stepId} : {}),
+      event_type: eventType,
+    });
     this.schedule();
   }
 
@@ -62,19 +62,15 @@ export class Analytics {
 
     const batch = this.queue;
     this.queue = [];
-
     if (!this.config.apiUrl) return;
 
     const url = `${this.config.apiUrl}/api/v1/embed/events`;
     const body = JSON.stringify(batch);
-
-    if (navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain;charset=UTF-8' }))) {
-      return;
-    }
+    if (navigator.sendBeacon?.(url, new Blob([body], {type: 'text/plain;charset=UTF-8'}))) return;
 
     void fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      headers: {'Content-Type': 'text/plain;charset=UTF-8'},
       body,
       keepalive: true,
     }).catch(() => undefined);

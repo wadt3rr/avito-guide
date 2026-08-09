@@ -1,8 +1,9 @@
 import { computePosition } from './position';
 import { STYLES } from './styles';
-import type { Step } from './types';
+import type { ScenarioType, Step } from './types';
 
 export interface StepView {
+  type: ScenarioType;
   step: Step;
   index: number;
   total: number;
@@ -21,10 +22,12 @@ const HOST_ID = 'avito-onboarding-root';
 export class Ui {
   private readonly host: HTMLElement;
   private readonly root: ShadowRoot;
+  private readonly catcher: HTMLElement;
   private readonly spot: HTMLElement;
   private readonly tip: HTMLElement;
   private target: HTMLElement | null = null;
   private frame = 0;
+  private renderVersion = 0;
 
   constructor(private readonly handlers: UiHandlers) {
     this.host = document.createElement('div');
@@ -35,10 +38,10 @@ export class Ui {
     const style = document.createElement('style');
     style.textContent = STYLES;
 
-    const catcher = document.createElement('div');
-    catcher.className = 'catch';
-    catcher.style.pointerEvents = 'auto';
-    catcher.addEventListener('click', () => this.handlers.onDismiss());
+    this.catcher = document.createElement('div');
+    this.catcher.className = 'catch';
+    this.catcher.style.pointerEvents = 'auto';
+    this.catcher.addEventListener('click', () => this.handlers.onDismiss());
 
     this.spot = document.createElement('div');
     this.spot.className = 'spot';
@@ -47,7 +50,7 @@ export class Ui {
     this.tip.className = 'tip';
     this.tip.style.pointerEvents = 'auto';
 
-    this.root.append(style, catcher, this.spot, this.tip);
+    this.root.append(style, this.catcher, this.spot, this.tip);
     document.body.appendChild(this.host);
 
     this.onReflow = this.onReflow.bind(this);
@@ -55,18 +58,38 @@ export class Ui {
     window.addEventListener('resize', this.onReflow);
   }
 
-  render(view: StepView, target: HTMLElement): void {
-    this.target = target;
+  render(view: StepView, target?: HTMLElement): void {
+    const renderVersion = ++this.renderVersion;
+    this.target = view.type === 'tooltip' ? (target ?? null) : null;
+    this.host.dataset.type = view.type;
+    this.catcher.className = `catch catch--${view.type}`;
+    this.catcher.style.pointerEvents = view.type === 'banner' ? 'none' : 'auto';
+    this.spot.hidden = view.type !== 'tooltip';
+    this.tip.className = `tip tip--${view.type}`;
+    this.tip.style.removeProperty('visibility');
+    this.tip.style.removeProperty('top');
+    this.tip.style.removeProperty('left');
+    this.tip.removeAttribute('data-placement');
     this.tip.dataset.ready = '0';
     this.tip.replaceChildren(this.buildTip(view));
     this.reposition();
 
     const reveal = () => {
+      if (renderVersion !== this.renderVersion) return;
       this.reposition();
       this.tip.dataset.ready = '1';
     };
     requestAnimationFrame(reveal);
     setTimeout(reveal, 50);
+  }
+
+  /** Stops the old step from following its target while the page scrolls to the next one. */
+  prepareForTransition(): void {
+    this.renderVersion += 1;
+    this.target = null;
+    this.tip.dataset.ready = '0';
+    this.tip.style.visibility = 'hidden';
+    this.spot.hidden = true;
   }
 
   destroy(): void {
@@ -77,8 +100,11 @@ export class Ui {
   }
 
   private onReflow(): void {
-    cancelAnimationFrame(this.frame);
-    this.frame = requestAnimationFrame(() => this.reposition());
+    if (this.frame) return;
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0;
+      this.reposition();
+    });
   }
 
   private reposition(): void {
@@ -116,16 +142,24 @@ export class Ui {
     head.append(close);
 
     const foot = el('div', 'tip__foot');
-    foot.append(el('div', 'tip__count', `${view.index + 1} из ${view.total}`));
-
     const actions = el('div', 'tip__actions');
-    if (view.canGoBack) {
-      actions.append(button('Назад', 'btn--ghost', this.handlers.onBack));
+    const isTour = view.type === 'tooltip' && view.total > 1;
+
+    if (isTour) {
+      foot.append(el('div', 'tip__count', `${view.index + 1} из ${view.total}`));
+      if (view.canGoBack) {
+        actions.append(button('Назад', 'btn--ghost', this.handlers.onBack));
+      }
+      actions.append(button('Пропустить', 'btn--ghost', this.handlers.onSkip));
     }
-    actions.append(button('Пропустить', 'btn--ghost', this.handlers.onSkip));
+
     actions.append(
       button(
-        view.index === view.total - 1 ? 'Готово' : 'Далее',
+        isTour && view.index < view.total - 1
+          ? 'Далее'
+          : view.type === 'tooltip'
+            ? 'Готово'
+            : 'Понятно',
         'btn--primary',
         this.handlers.onNext,
       ),
