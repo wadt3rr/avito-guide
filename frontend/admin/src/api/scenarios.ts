@@ -54,6 +54,36 @@ interface IApiScenarioPatch extends IApiScenarioPayload {
     url_pattern: string
 }
 
+export interface IScenarioStepAnalytics {
+    stepId: string
+    stepOrder: number
+    title: string
+    completed: number
+}
+
+export interface IScenarioAnalytics {
+    scenarioId: string
+    started: number
+    finished: number
+    conversion: number
+    steps: IScenarioStepAnalytics[]
+}
+
+interface IApiScenarioStepAnalytics {
+    step_id: string
+    step_order: number
+    title: string
+    completed: number
+}
+
+interface IApiScenarioAnalytics {
+    scenario_id: string
+    started: number
+    finished: number
+    conversion: number
+    steps?: IApiScenarioStepAnalytics[] | null
+}
+
 export type ScenarioPublicationAction = 'publish' | 'unpublish'
 
 const apiOrigin = (import.meta.env.VITE_API_URL ?? 'http://localhost:8081').replace(
@@ -181,6 +211,29 @@ export async function getScenarios(): Promise<IScenario[]> {
 export async function getScenarioById(id: string): Promise<IScenario> {
     const scenario = await request<IApiScenario>(`${scenariosUrl}/${id}`)
     return apiScenarioToScenario(scenario)
+}
+
+export async function getScenarioAnalytics(
+    id: string,
+): Promise<IScenarioAnalytics> {
+    const analytics = await request<IApiScenarioAnalytics>(
+        `${scenariosUrl}/${id}/analytics`,
+    )
+
+    return {
+        scenarioId: analytics.scenario_id,
+        started: analytics.started,
+        finished: analytics.finished,
+        conversion: analytics.conversion,
+        steps: (analytics.steps ?? [])
+            .map((step) => ({
+                stepId: step.step_id,
+                stepOrder: step.step_order,
+                title: step.title,
+                completed: step.completed,
+            }))
+            .sort((firstStep, secondStep) => firstStep.stepOrder - secondStep.stepOrder),
+    }
 }
 
 export async function createScenario(
