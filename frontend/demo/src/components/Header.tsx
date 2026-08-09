@@ -5,10 +5,6 @@ import { anchor } from '../onboarding-anchors';
 const UTILITY_LINKS = ['Для бизнеса', 'Карьера в Авито', 'Помощь', 'Каталоги', '#яПомогаю'];
 const PROFILE_NAV = ['Бизнес360', 'Авто', 'Недвижимость', 'Работа', 'Услуги', 'Ещё'];
 
-/**
- * В личном кабинете вторая строка шапки другая: вместо поиска — навигация
- * по вертикалям. Поэтому у шапки два режима.
- */
 export function Header({ variant = 'main' }: { variant?: 'main' | 'profile' }) {
   return (
     <header className="header">

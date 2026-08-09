@@ -19,11 +19,6 @@ export interface UiHandlers {
 
 const HOST_ID = 'avito-onboarding-root';
 
-/**
- * Слой отображения: подсветка цели и подсказка рядом с ней.
- * Всё живёт в Shadow DOM, поэтому стили сайта не портят подсказку,
- * а её стили не текут на сайт.
- */
 export class Ui {
   private readonly host: HTMLElement;
   private readonly root: ShadowRoot;
@@ -43,10 +38,9 @@ export class Ui {
     const style = document.createElement('style');
     style.textContent = STYLES;
 
-    // Перехватывает клики мимо подсветки, чтобы человек не проваливался
-    // в интерфейс сайта посреди сценария.
     this.catcher = document.createElement('div');
     this.catcher.className = 'catch';
+    this.catcher.style.pointerEvents = 'auto';
     this.catcher.addEventListener('click', () => this.handlers.onDismiss());
 
     this.spot = document.createElement('div');
@@ -80,9 +74,6 @@ export class Ui {
     this.tip.replaceChildren(this.buildTip(view));
     this.reposition();
 
-    // Ждём раскладку, чтобы измерить подсказку и показать её уже на месте.
-    // Вызов идемпотентен, поэтому дублируем через таймер: на скрытой вкладке
-    // requestAnimationFrame не срабатывает, и подсказка осталась бы невидимой.
     const reveal = () => {
       if (renderVersion !== this.renderVersion) return;
       this.reposition();

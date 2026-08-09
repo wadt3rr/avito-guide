@@ -1,7 +1,3 @@
-/**
- * Статические данные демо-сайта. Своего бэкенда у сцены нет и не нужно:
- * задача сайта — дать правдоподобные места, где новичок застревает.
- */
 
 export type Vertical = 'goods' | 'jobs';
 
@@ -25,7 +21,6 @@ export interface Listing {
   sellerRating?: number;
 }
 
-/** Объявление в личном кабинете — со статистикой, по которой видно, что оно не продаётся. */
 export interface MyListing {
   id: string;
   title: string;
@@ -41,7 +36,6 @@ export interface MyListing {
   address: string;
   hasDelivery: boolean;
   status: string;
-  /** Карточка-проблема: мало просмотров при долгом сроке размещения. */
   isStale: boolean;
 }
 
@@ -70,7 +64,6 @@ export interface CompletedOrder {
 
 export const CITY = 'Москва';
 
-/** Вымышленный владелец демо-профиля. */
 export const PROFILE_NAME = 'Мария';
 export const PROFILE_RATING = '4,8';
 export const PROFILE_REVIEWS = '17 отзывов';
@@ -218,11 +211,6 @@ export const LISTINGS: Listing[] = [
   },
 ];
 
-/**
- * Объявления пользователя. Две «залежавшиеся» карточки — в разных вертикалях:
- * товар и резюме. Один и тот же сценарий онбординга настраивается на обе,
- * меняется только содержание подсказок.
- */
 export const MY_LISTINGS: MyListing[] = [
   {
     id: 'm1',
@@ -333,7 +321,6 @@ export const COMPLETED_ORDERS: CompletedOrder[] = [
   },
 ];
 
-/** Пункты бокового меню личного кабинета. `to` есть только у собранных разделов. */
 export const PROFILE_MENU: {
   group: string;
   items: { label: string; badge?: string; to?: string }[];

@@ -1,18 +1,4 @@
-import type {
-  BackendAnalyticsEvent,
-  BackendEventType,
-  EventType,
-  WidgetConfig,
-} from './types';
-
-/**
- * Отправка событий прохождения.
- *
- * События копятся в очереди и уходят пачкой. При уходе со страницы обычный
- * запрос браузер обрывает — и теряется ровно то событие, ради которого всё
- * затевалось: «человек бросил на шаге два». Поэтому на выходе используем
- * sendBeacon, он переживает закрытие вкладки.
- */
+import type {BackendAnalyticsEvent, BackendEventType, EventType, WidgetConfig} from './types';
 
 const FLUSH_INTERVAL_MS = 3000;
 
@@ -43,27 +29,18 @@ export class Analytics {
     });
   }
 
-  track(
-    type: EventType,
-    scenarioId: string,
-    stepId: string | null,
-    meta?: Record<string, unknown>,
-  ): void {
-    if (this.config.debug) {
-      console.info('[onboarding]', type, meta ?? '');
-    }
+  track(type: EventType, scenarioId: string, stepId: string | null, meta?: Record<string, unknown>): void {
+    if (this.config.debug) console.info('[onboarding]', type, meta ?? '');
 
     const eventType = BACKEND_EVENT_TYPES[type];
     if (!eventType) return;
 
-    const event: BackendAnalyticsEvent = {
+    this.queue.push({
       scenario_id: scenarioId,
       session_id: this.identity.sessionId,
-      ...(stepId ? { step_id: stepId } : {}),
+      ...(stepId ? {step_id: stepId} : {}),
       event_type: eventType,
-    };
-
-    this.queue.push(event);
+    });
     this.schedule();
   }
 
@@ -83,28 +60,19 @@ export class Analytics {
   private flush(): void {
     if (this.queue.length === 0) return;
 
-    const events = this.queue;
+    const batch = this.queue;
     this.queue = [];
-
     if (!this.config.apiUrl) return;
 
-    const url = `${this.config.apiUrl}/api/v1/analytics/events`;
+    const url = `${this.config.apiUrl}/api/v1/embed/events`;
+    const body = JSON.stringify(batch);
+    if (navigator.sendBeacon?.(url, new Blob([body], {type: 'text/plain;charset=UTF-8'}))) return;
 
-    for (const event of events) {
-      const body = JSON.stringify(event);
-      const sent = navigator.sendBeacon?.(
-        url,
-        new Blob([body], { type: 'application/json' }),
-      );
-      if (sent) continue;
-
-      // Аналитика никогда не должна ронять хост-приложение.
-      void fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => undefined);
-    }
+    void fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=UTF-8'},
+      body,
+      keepalive: true,
+    }).catch(() => undefined);
   }
 }

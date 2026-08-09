@@ -6,25 +6,22 @@ import {
   type DeliveryStage,
 } from '../data/mock';
 import { anchor, type AnchorId } from '../onboarding-anchors';
+import { useOnboardingContext } from '../onboarding-context';
 
 const SECTION_TABS = ['Товары', 'Услуги', 'Жильё посуточно'];
 const FILTERS = ['Покупаю', 'Продаю', 'Статус ⌄', 'Служба доставки ⌄'];
 
-/** Якоря есть только у шагов, к которым цепляются подсказки сценария. */
 const STAGE_ANCHORS: Partial<Record<DeliveryStage, AnchorId>> = {
   pack: 'delivery-pack',
   dropoff: 'delivery-dropoff',
   payout: 'delivery-payout',
 };
 
-/**
- * Заказы и заявки — сцена сценария 2.
- * Онбординг здесь привязан не к странице и не к сегменту, а к состоянию сделки:
- * подсказки идут по мере продвижения заказа и растянуты на несколько дней.
- */
 export function DeliveryPage() {
   const order = DELIVERY_ORDER;
   const currentIndex = DELIVERY_STAGES.findIndex((stage) => stage.id === order.stage);
+
+  useOnboardingContext({ order_stage: order.stage });
 
   return (
     <div className="container profile">

@@ -1,10 +1,3 @@
-/**
- * Расчёт положения подсказки относительно цели.
- *
- * Своя реализация вместо Floating UI: нужны четыре стороны и переворот
- * у края экрана, это шестьдесят строк. Библиотека дала бы плюс десять
- * килобайт в файле, который встраивается в чужой сайт.
- */
 
 export type Placement = 'bottom' | 'top' | 'right' | 'left';
 
@@ -19,9 +12,7 @@ export interface Position {
   placement: Placement;
 }
 
-/** Зазор между целью и подсказкой. */
 const GAP = 12;
-/** Минимальный отступ от края экрана. */
 const EDGE = 12;
 
 const ORDER: Placement[] = ['bottom', 'top', 'right', 'left'];
@@ -47,11 +38,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-/**
- * Выбирает сторону, на которой подсказка помещается целиком. Если не помещается
- * нигде — берёт сторону с наибольшим запасом и прижимает подсказку к краю,
- * чтобы она в любом случае осталась на экране.
- */
 export function computePosition(target: DOMRect, tip: Size, viewport: Size): Position {
   const placement =
     ORDER.find((candidate) => spaceFor(candidate, target, viewport) >= needFor(candidate, tip)) ??

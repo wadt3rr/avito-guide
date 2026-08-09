@@ -15,6 +15,7 @@ const widgetMocks = vi.hoisted(() => ({
 
 vi.mock('./analytics', () => ({ Analytics: class {} }));
 vi.mock('./progress', () => ({
+  getAnonId: () => 'anon-test',
   getSessionId: () => 'session-test',
 }));
 vi.mock('./source', () => ({
@@ -83,8 +84,8 @@ describe('widget SPA lifecycle', () => {
     expect(widgetMocks.runners[0].stop).toHaveBeenCalledOnce();
     expect(widgetMocks.runners[1].scenario.id).toBe('scenario-/my');
     expect(widgetMocks.runners[1].start).toHaveBeenCalledOnce();
-    expect(widgetMocks.resolve).toHaveBeenNthCalledWith(1, { path: '/create' });
-    expect(widgetMocks.resolve).toHaveBeenNthCalledWith(2, { path: '/my' });
+    expect(widgetMocks.resolve).toHaveBeenNthCalledWith(1, expect.objectContaining({ path: '/create' }));
+    expect(widgetMocks.resolve).toHaveBeenNthCalledWith(2, expect.objectContaining({ path: '/my' }));
   });
 
   it('ignores a stale scenario resolved for the previous pathname', async () => {

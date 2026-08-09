@@ -18,5 +18,5 @@
     "noFallthroughCasesInSwitch": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src"]
+  "include": ["src", "src/vitest-shims.d.ts"]
 }

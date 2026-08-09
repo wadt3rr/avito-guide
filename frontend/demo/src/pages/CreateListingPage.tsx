@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { anchor } from '../onboarding-anchors';
+import { useOnboardingContext } from '../onboarding-context';
 
 const BREADCRUMB = ['Личные вещи', 'Одежда, обувь, аксессуары', 'Женская одежда', 'Джинсы'];
 
@@ -14,12 +15,6 @@ const CUTS = ['Прямые', 'Широкие', 'Узкие', 'Джинсы мо
 const CONTACT_WAYS = ['Звонки и сообщения', 'Только звонки', 'Только сообщения'];
 const PHOTO_SLOTS = [0, 1, 2, 3];
 
-/**
- * Форма подачи объявления — основная сцена сценария 1.
- * Повторяет строение настоящей формы: узкая колонка, разделы с крупными
- * заголовками, поля с подсказками под ними. Каждое поле — место, где новичок
- * ошибается: заголовок без модели, пустое описание, одно фото, цена наугад.
- */
 export function CreateListingPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -27,6 +22,8 @@ export function CreateListingPage() {
   const [condition, setCondition] = useState('');
   const [cut, setCut] = useState('');
   const [contactWay, setContactWay] = useState(CONTACT_WAYS[0]);
+
+  useOnboardingContext({ flow: 'create_listing' });
 
   return (
     <div className="container additem">

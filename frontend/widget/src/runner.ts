@@ -1,18 +1,10 @@
-import type { Analytics } from './analytics';
-import { resolveTarget, scrollIntoView } from './element';
-import { getProgress, saveProgress } from './progress';
-import { normalizeScenarioType } from './scenario-type';
-import type { Scenario, ScenarioType, Step } from './types';
-import { Ui } from './ui';
+import type {Analytics} from './analytics';
+import {resolveTarget, scrollIntoView} from './element';
+import {getProgress, saveProgress} from './progress';
+import {normalizeScenarioType} from './scenario-type';
+import type {Scenario, ScenarioType, Step} from './types';
+import {Ui} from './ui';
 
-/**
- * Прохождение сценария как явная машина состояний.
- *
- * Альтернатива — набор флагов вида isVisible/isWaiting/currentStep — на третьем
- * сценарии превращается в кашу и даёт кривую воронку: события начинают
- * отправляться дважды или не отправляться вовсе. Здесь каждый переход
- * порождает ровно одно событие.
- */
 type State = 'idle' | 'resolving' | 'showing' | 'finished' | 'aborted';
 
 export interface RunnerOptions {
@@ -31,6 +23,7 @@ export class Runner {
     private readonly scenario: Scenario,
     private readonly analytics: Analytics,
     options: RunnerOptions = {},
+    private readonly onEnd: () => void = () => {},
   ) {
     this.type = normalizeScenarioType(scenario.type);
     this.isPreview = options.mode === 'preview';
@@ -39,12 +32,12 @@ export class Runner {
 
   async start(): Promise<void> {
     if (this.state !== 'idle') return;
-
     const saved = this.isPreview ? null : getProgress(this.scenario.id);
     if (saved?.finished) return;
 
-    this.index =
-      this.type === 'tooltip' ? Math.min(saved?.step ?? 0, this.scenario.steps.length - 1) : 0;
+    this.index = this.type === 'tooltip'
+      ? Math.min(saved?.step ?? 0, this.scenario.steps.length - 1)
+      : 0;
 
     this.ui = new Ui({
       onNext: () => void this.advance('step_completed'),
@@ -53,24 +46,12 @@ export class Runner {
       onDismiss: () => this.dismiss(),
     });
     document.addEventListener('keydown', this.onKeyDown);
-
-    this.track('scenario_started', null, {
-      resumed_at_step: this.index,
-    });
-
+    this.track('scenario_started', null, {resumed_at_step: this.index});
     await this.enter(this.index);
   }
 
-  /** Stops rendering because the host page changed, without treating it as a user dismissal. */
-  stop(): void {
-    if (this.state === 'finished' || this.state === 'aborted') return;
-    this.teardown('aborted');
-  }
-
-  /** Показывает шаг. Если цель не нашлась — честно сообщает и идёт дальше. */
   private async enter(index: number): Promise<void> {
     if (this.state === 'finished' || this.state === 'aborted') return;
-
     const step = this.scenario.steps[index];
     if (!step) return this.finish();
 
@@ -90,11 +71,9 @@ export class Runner {
       step.timeout_sec * 1000,
       this.pending.signal,
     );
-
     if (this.pending.signal.aborted) return;
 
     if (!target) {
-      // Единственный сигнал команде, что сценарий сломан вёрсткой.
       this.track('step_failed', step.id, {
         selector: step.selector ?? '',
         reason: 'target_not_found',
@@ -104,21 +83,16 @@ export class Runner {
 
     await scrollIntoView(target);
     if (this.pending.signal.aborted) return;
-
     this.state = 'showing';
     this.saveProgress(index);
     this.track('step_shown', step.id);
-
-    this.ui?.render(
-      {
-        type: this.type,
-        step,
-        index,
-        total: this.scenario.steps.length,
-        canGoBack: index > 0,
-      },
-      target,
-    );
+    this.ui?.render({
+      type: this.type,
+      step,
+      index,
+      total: this.scenario.steps.length,
+      canGoBack: index > 0,
+    }, target);
   }
 
   private showStandalone(step: Step): void {
@@ -126,21 +100,12 @@ export class Runner {
     this.index = 0;
     this.saveProgress(0);
     this.track('step_shown', step.id);
-    this.ui?.render({
-      type: this.type,
-      step,
-      index: 0,
-      total: 1,
-      canGoBack: false,
-    });
+    this.ui?.render({type: this.type, step, index: 0, total: 1, canGoBack: false});
   }
 
-  /** Ни один шаг не нашёлся до конца сценария — показывать больше нечего. */
   private async skipUnresolvable(index: number): Promise<void> {
     if (index + 1 >= this.scenario.steps.length) {
-      this.track('scenario_dismissed', null, {
-        reason: 'no_resolvable_steps',
-      });
+      this.track('scenario_dismissed', null, {reason: 'no_resolvable_steps'});
       return this.teardown('aborted');
     }
     await this.enter(index + 1);
@@ -148,10 +113,8 @@ export class Runner {
 
   private async advance(reason: 'step_completed' | 'step_skipped'): Promise<void> {
     if (this.state !== 'showing') return;
-
     const step = this.scenario.steps[this.index];
     if (step) this.track(reason, step.id);
-
     if (this.type !== 'tooltip' || this.index + 1 >= this.scenario.steps.length) {
       return this.finish();
     }
@@ -169,14 +132,17 @@ export class Runner {
     this.teardown('finished');
   }
 
-  private dismiss(): void {
+  stop(reason = 'host_navigation'): void {
     if (this.state === 'finished' || this.state === 'aborted') return;
-
-    const step = this.scenario.steps[this.index];
-    this.track('scenario_dismissed', step?.id ?? null, {
-      at_step: this.index,
-    });
+    if (reason === 'user_closed') {
+      const step = this.scenario.steps[this.index];
+      this.track('scenario_dismissed', step?.id ?? null, {at_step: this.index, reason});
+    }
     this.teardown('aborted');
+  }
+
+  private dismiss(): void {
+    this.stop('user_closed');
   }
 
   private teardown(state: State): void {
@@ -185,17 +151,14 @@ export class Runner {
     document.removeEventListener('keydown', this.onKeyDown);
     this.ui?.destroy();
     this.ui = null;
+    this.onEnd();
   }
 
   private onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') this.dismiss();
   }
 
-  private track(
-    type: Parameters<Analytics['track']>[0],
-    stepId: string | null,
-    meta?: Record<string, unknown>,
-  ): void {
+  private track(type: Parameters<Analytics['track']>[0], stepId: string | null, meta?: Record<string, unknown>): void {
     if (this.isPreview) return;
     this.analytics.track(type, this.scenario.id, stepId, meta);
   }

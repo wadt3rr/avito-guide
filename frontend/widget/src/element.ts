@@ -1,15 +1,6 @@
-/**
- * Поиск цели подсказки.
- *
- * Элемента может не быть по трём причинам: страница ещё не отрисовалась,
- * человек ушёл в другой раздел, вёрстку переделали и селектор устарел.
- * Все три выглядят одинаково — элемента нет, — поэтому ждём его появления
- * до таймаута и честно возвращаем null, когда не дождались.
- */
 
 const POLL_INTERVAL_MS = 100;
 
-/** Элемент считается пригодным, только если его реально видно. */
 export function isVisible(el: Element): boolean {
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return false;
@@ -23,17 +14,12 @@ function find(selector: string): HTMLElement | null {
   try {
     el = document.querySelector(selector);
   } catch {
-    // Селектор из админки может быть синтаксически неверным — это не повод падать.
     return null;
   }
   if (!el || !(el instanceof HTMLElement)) return null;
   return isVisible(el) ? el : null;
 }
 
-/**
- * Ждёт появления видимого элемента. Возвращает null, если не дождался
- * или ожидание было прервано.
- */
 export function resolveTarget(
   selector: string,
   timeoutMs: number,
@@ -63,9 +49,6 @@ export function resolveTarget(
 
     const onAbort = () => finish(null);
 
-    // Наблюдатель ловит быструю отрисовку, опрос страхует от изменений,
-    // которые не порождают мутаций DOM — например, снятия display: none
-    // через медиавыражение.
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, {
       childList: true,
@@ -80,19 +63,10 @@ export function resolveTarget(
   });
 }
 
-/** Как долго ждём остановки прокрутки, прежде чем показать подсказку всё равно. */
 const SCROLL_SETTLE_TIMEOUT_MS = 700;
 const SCROLL_POLL_MS = 32;
 const SCROLL_POSITION_EPSILON_PX = 0.5;
 
-/**
- * Прокручивает цель в зону видимости и ждёт, пока прокрутка успокоится.
- *
- * Намеренно не используем requestAnimationFrame: на скрытой вкладке браузер
- * его не вызывает, и ожидание зависло бы навсегда — человек, переключившийся
- * на другую вкладку, вернулся бы к мёртвому онбордингу. Опрос по таймеру
- * работает и в фоне, а верхняя граница ожидания страхует в любом случае.
- */
 function isInViewport(el: HTMLElement): boolean {
   const rect = el.getBoundingClientRect();
   return (
@@ -115,9 +89,6 @@ export function scrollIntoView(el: HTMLElement): Promise<void> {
 
     const finish = () => {
       clearInterval(timer);
-      // Плавная прокрутка могла не состояться — например, вкладка неактивна
-      // или система выключила анимации. Показывать подсказку рядом с целью
-      // за пределами экрана нельзя, поэтому доводим прокрутку мгновенно.
       if (!isInViewport(el)) {
         el.scrollIntoView({ block: 'center', inline: 'nearest' });
       }

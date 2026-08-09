@@ -15,8 +15,8 @@ describe('mock scenario source', () => {
     expect(scenario?.steps).toHaveLength(stepCount);
   });
 
-  it('does not call a missing backend resolve endpoint when data-api is configured', async () => {
-    const fetchMock = vi.fn();
+  it('resolves through the backend when data-api is configured', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, {status: 204}));
     vi.stubGlobal('fetch', fetchMock);
 
     const configuredSource = createSource({
@@ -25,8 +25,11 @@ describe('mock scenario source', () => {
     });
     const scenario = await configuredSource.resolve({ path: '/my' });
 
-    expect(scenario?.type).toBe('modal');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(scenario).toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8081/api/v1/embed/resolve',
+      expect.objectContaining({method: 'POST'}),
+    );
     vi.unstubAllGlobals();
   });
 });

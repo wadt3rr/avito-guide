@@ -1,7 +1,5 @@
 import { defineConfig } from 'vite';
 
-// Сборка в один самодостаточный файл: хост подключает его обычным <script src>,
-// без сборщика и загрузчика модулей на своей стороне.
 export default defineConfig({
   build: {
     lib: {
@@ -13,5 +11,9 @@ export default defineConfig({
     target: 'es2019',
     minify: 'esbuild',
     emptyOutDir: true,
+    watch:
+      process.env.WATCH_POLL === '1'
+        ? { chokidar: { usePolling: true, interval: 300 } }
+        : null,
   },
 });

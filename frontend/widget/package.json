@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n build,serve -c blue,green \"vite build --watch\" \"sirv dist --port 8082 --host 0.0.0.0 --cors --dev\"",
-    "test": "vitest",
+    "dev": "concurrently -n build,serve -c blue,green \"WATCH_POLL=1 vite build --watch\" \"sirv dist --port 8082 --host 0.0.0.0 --cors --dev\"",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.ts\""
   },

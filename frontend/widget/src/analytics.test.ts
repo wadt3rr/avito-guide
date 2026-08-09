@@ -25,14 +25,14 @@ describe('backend analytics contract', () => {
     analytics.destroy();
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8081/api/v1/analytics/events', {
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8081/api/v1/embed/events', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify([{
         scenario_id: 'scenario-id',
         session_id: 'session-test',
         event_type: 'started',
-      }),
+      }]),
       keepalive: true,
     });
   });
@@ -55,8 +55,8 @@ describe('backend analytics contract', () => {
     analytics.track('scenario_dismissed', 'scenario-id', 'step-id');
     analytics.destroy();
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls.map((call) => JSON.parse(call[1].body as string))).toEqual([
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1].body as string)).toEqual([
       {
         scenario_id: 'scenario-id',
         session_id: 'session-test',

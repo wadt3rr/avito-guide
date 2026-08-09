@@ -133,6 +133,34 @@ func (s *stubScenarioStorage) CreateAnalyticsEvent(ctx context.Context, req mode
 	return nil
 }
 
+func (s *stubScenarioStorage) CreateAnalyticsEvents(ctx context.Context, events []models.CreateEventReq) error {
+	s.analytics = append(s.analytics, events...)
+	return nil
+}
+
+func (s *stubScenarioStorage) ResolveScenario(ctx context.Context, req models.ResolveRequest) (*models.Scenario, error) {
+	for _, scenario := range s.scenarios {
+		if scenario.PublishedAt == nil {
+			continue
+		}
+		if scenario.URLPattern != "*" && scenario.URLPattern != req.URL {
+			continue
+		}
+		matched := true
+		for key, want := range scenario.MatchContext {
+			if req.Context[key] != want {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			found := scenario
+			return &found, nil
+		}
+	}
+	return nil, storage.ErrNotFound
+}
+
 func TestRouter_Scenarios(t *testing.T) {
 	tests := []struct {
 		name         string
