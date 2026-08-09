@@ -1,0 +1,105 @@
+@use '../../styles/tokens' as tokens;
+
+.scenarios-page {
+  min-height: 100svh;
+  color: tokens.$color-ink;
+  background: tokens.$color-canvas;
+
+  &__main {
+    min-height: 100svh;
+    margin-left: tokens.$sidebar-width;
+
+    @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+      margin-left: 0;
+    }
+  }
+
+  &__content {
+    width: min(100%, tokens.$content-max-width);
+    padding: 48px 36px;
+    margin: 0 0;
+
+    @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+      padding: 32px 24px;
+    }
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      padding: 28px 16px;
+    }
+  }
+
+  &__heading-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 40px;
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      align-items: flex-start;
+      flex-direction: column;
+      margin-bottom: 28px;
+    }
+  }
+
+  &__title {
+    margin: 0;
+    color: tokens.$color-ink;
+    font: 700 26px/32px tokens.$font-heading;
+    letter-spacing: -0.02em;
+
+    @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+      font-size: 22px;
+      line-height: 28px;
+      letter-spacing: 0;
+    }
+  }
+
+  &__create-button {
+    min-height: 40px;
+    padding-inline: 20px;
+    font-size: 15.5px;
+    line-height: 20px;
+  }
+
+  &__state,
+  &__error {
+    color: tokens.$color-ink-soft;
+    font: 400 14px/22px tokens.$font-ui;
+  }
+
+  &__state {
+    margin: 0;
+  }
+
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    p {
+      margin: 0;
+    }
+  }
+
+}
+
+.scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  justify-content: start;
+  gap: 16px;
+
+  > * {
+    width: 100%;
+    max-width: 360px;
+  }
+
+  @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+    grid-template-columns: minmax(0, 1fr);
+
+    > * {
+      max-width: none;
+    }
+  }
+}

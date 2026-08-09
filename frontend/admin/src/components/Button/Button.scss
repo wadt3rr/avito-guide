@@ -1,0 +1,78 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: tokens.$radius-control;
+  font: 600 12.5px/16px tokens.$font-ui;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+
+  &__icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  &--primary {
+    color: tokens.$color-surface;
+    background: tokens.$color-accent;
+
+    &:hover:not(:disabled) {
+      background: tokens.$color-accent-hover;
+    }
+
+    &:active:not(:disabled) {
+      background: tokens.$color-accent-active;
+      transform: translateY(1px);
+    }
+  }
+
+  &--secondary {
+    color: tokens.$color-ink;
+    background: tokens.$color-surface;
+    border-color: tokens.$color-border;
+
+    &:hover:not(:disabled) {
+      background: tokens.$color-surface-muted;
+    }
+
+    &:active:not(:disabled) {
+      background: tokens.$color-surface-hover;
+      transform: translateY(1px);
+    }
+  }
+
+  &--danger {
+    color: #ff4053;
+    background: #ffe1e1;
+
+    &:hover:not(:disabled) {
+      background: #fbbdc7;
+    }
+
+    &:active:not(:disabled) {
+      background: #ffdde1;
+      transform: translateY(1px);
+    }
+  }
+
+  &:focus-visible {
+    @include mixins.focus-ring;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

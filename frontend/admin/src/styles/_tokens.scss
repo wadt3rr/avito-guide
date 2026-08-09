@@ -1,0 +1,29 @@
+$color-canvas: #f8f9fb;
+$color-surface: #ffffff;
+$color-surface-muted: #f2f4f6;
+$color-surface-hover: #eceef0;
+$color-ink: #191c1e;
+$color-ink-soft: #565b66;
+$color-ink-faint: #9296a0;
+$color-border: #e4e7ec;
+$color-accent: #0090de;
+$color-accent-hover: #0084cc;
+$color-accent-active: #0077b8;
+$color-success: #00a85c;
+$color-success-surface: #e5f8ed;
+$color-warning: #d97000;
+$color-warning-surface: #fff3e0;
+
+$font-ui: 'Inter', 'Segoe UI', sans-serif;
+$font-heading: 'Hanken Grotesk', 'Inter', 'Segoe UI', sans-serif;
+
+$sidebar-width: 232px;
+$content-max-width: 1680px;
+$breakpoint-desktop: 1024px;
+$breakpoint-tablet: 768px;
+$breakpoint-grid: 1680px;
+
+$radius-control: 8px;
+$radius-card: 12px;
+$shadow-card: 0 1px 2px rgb(0 0 0 / 5%), 0 4px 24px rgb(0 0 0 / 3%);
+$shadow-card-hover: 0 1px 3px rgb(0 0 0 / 5%), 0 8px 32px rgb(0 0 0 / 6%);

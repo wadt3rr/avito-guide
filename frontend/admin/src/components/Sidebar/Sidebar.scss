@@ -1,0 +1,101 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.sidebar {
+  position: fixed;
+  z-index: 20;
+  inset: 0 auto 0 0;
+  width: tokens.$sidebar-width;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  color: tokens.$color-ink;
+  background: tokens.$color-surface;
+  border-right: 1px solid tokens.$color-border;
+
+  &__brand {
+    padding: 16px 8px 0;
+    margin-bottom: 31px;
+    font: 700 22px/28px tokens.$font-heading;
+    letter-spacing: -0.01em;
+  }
+
+  &__navigation {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  &__link {
+    position: relative;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    width: 100%;
+    color: tokens.$color-ink-soft;
+    background: transparent;
+    border: 0;
+    border-radius: tokens.$radius-control;
+    font: 600 14px/20px tokens.$font-ui;
+    text-decoration: none;
+    text-align: left;
+    transition:
+      color 150ms ease,
+      background-color 150ms ease;
+
+    svg {
+      flex: 0 0 auto;
+    }
+
+    &:hover {
+      color: tokens.$color-ink;
+      background: tokens.$color-surface-muted;
+    }
+
+    &:disabled {
+      cursor: default;
+
+      &:hover {
+        color: tokens.$color-ink-soft;
+        background: transparent;
+      }
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+
+    &--active {
+      color: tokens.$color-ink;
+      background: tokens.$color-surface-hover;
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: 8px auto 8px 0;
+        width: 2px;
+        border-radius: 999px;
+        background: tokens.$color-ink;
+      }
+    }
+  }
+
+  &__footer {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    margin-top: auto;
+    padding-bottom: 8px;
+  }
+
+  &__create-button {
+    width: 100%;
+    min-height: 36px;
+    font-size: 15.5px;
+    line-height: 20px;
+  }
+
+  @include mixins.desktop-only;
+}
