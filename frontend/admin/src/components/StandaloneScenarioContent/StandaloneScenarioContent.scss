@@ -1,0 +1,84 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.standalone-content {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.32fr) minmax(0, 1fr);
+  gap: 48px;
+
+  &__heading {
+    p {
+      margin: 0 0 6px;
+      color: tokens.$color-ink-faint;
+      font: 700 11.5px/16px tokens.$font-ui;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      color: tokens.$color-ink;
+      font: 700 20px/26px tokens.$font-heading;
+    }
+
+    span {
+      max-width: 220px;
+      display: block;
+      margin-top: 8px;
+      color: tokens.$color-ink-soft;
+      font: 400 13px/20px tokens.$font-ui;
+    }
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+    grid-template-columns: 1fr;
+    gap: 22px;
+
+    &__heading span {
+      max-width: none;
+    }
+  }
+}
+
+.standalone-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  > span {
+    color: tokens.$color-ink-soft;
+    font: 700 12.5px/16px tokens.$font-ui;
+  }
+
+  input,
+  textarea {
+    width: 100%;
+    min-height: 44px;
+    padding: 12px 14px;
+    color: tokens.$color-ink;
+    background: tokens.$color-surface-muted;
+    border: 0;
+    border-radius: 10px;
+    font: 400 14px/20px tokens.$font-ui;
+
+    &:hover {
+      background: tokens.$color-surface-hover;
+    }
+
+    &:focus {
+      background: tokens.$color-surface;
+      @include mixins.focus-ring;
+    }
+  }
+
+  textarea {
+    min-height: 104px;
+    resize: vertical;
+  }
+}

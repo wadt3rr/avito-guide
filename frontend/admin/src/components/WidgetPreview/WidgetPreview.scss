@@ -1,0 +1,69 @@
+@use '../../styles/tokens' as tokens;
+
+.widget-preview {
+  &__heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+
+    span {
+      color: tokens.$color-ink-soft;
+      font: 700 12.5px/16px tokens.$font-ui;
+    }
+
+    p {
+      margin: 0;
+      color: tokens.$color-ink-faint;
+      font: 500 11.5px/17px tokens.$font-ui;
+      text-align: right;
+    }
+  }
+
+  &__viewport {
+    position: relative;
+    height: clamp(280px, 34vw, 390px);
+    overflow: hidden;
+    background: tokens.$color-surface-muted;
+    border: 1px solid tokens.$color-border;
+    border-radius: tokens.$radius-card;
+  }
+
+  iframe {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border: 0;
+  }
+
+  &__state {
+    position: absolute;
+    inset: auto 12px 12px;
+    padding: 7px 10px;
+    color: tokens.$color-ink-soft;
+    background: rgb(255 255 255 / 92%);
+    border-radius: 8px;
+    font: 600 11.5px/16px tokens.$font-ui;
+    box-shadow: tokens.$shadow-card;
+
+    &--error {
+      color: #b42318;
+    }
+  }
+
+  @media (max-width: 520px) {
+    &__heading {
+      display: block;
+
+      p {
+        margin-top: 3px;
+        text-align: left;
+      }
+    }
+
+    &__viewport {
+      height: 310px;
+    }
+  }
+}

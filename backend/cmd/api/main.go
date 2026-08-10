@@ -137,6 +137,12 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "title is required", http.StatusBadRequest)
 				return
 			}
+			scenarioType, valid := models.NormalizeScenarioType(string(scenario.Type))
+			if !valid {
+				http.Error(w, "invalid scenario type", http.StatusBadRequest)
+				return
+			}
+			scenario.Type = scenarioType
 
 			id, err := store.CreateScenario(req.Context(), &scenario)
 			if err != nil {
@@ -167,10 +173,20 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
 			}
+			if updateReq.Type != nil {
+				if _, valid := models.NormalizeScenarioType(string(*updateReq.Type)); !valid {
+					http.Error(w, "invalid scenario type", http.StatusBadRequest)
+					return
+				}
+			}
 
 			if err := store.UpdateScenario(req.Context(), id, updateReq); err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
 					http.Error(w, "scenario not found", http.StatusNotFound)
+					return
+				}
+				if errors.Is(err, storage.ErrScenarioTypeImmutable) {
+					http.Error(w, err.Error(), http.StatusConflict)
 					return
 				}
 				log.Error("failed to update scenario", slog.String("error", err.Error()))

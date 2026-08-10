@@ -172,7 +172,7 @@ export function AnalyticsPage() {
                     {isLoading && (
                         <div className="analytics-page__state" role="status">
                             <span className="analytics-page__spinner"/>
-                            <p>Загружаем аналитику…</p>
+                            <p>Загрузка</p>
                         </div>
                     )}
 

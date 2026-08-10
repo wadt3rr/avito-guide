@@ -9,6 +9,7 @@ import (
 type Scenario struct {
 	ID           uuid.UUID         `json:"id"`
 	Title        string            `json:"title"`
+	Type         ScenarioType      `json:"type"`
 	Description  *string           `json:"description"`
 	Status       string            `json:"status"`
 	PublishedAt  *time.Time        `json:"published_at"`

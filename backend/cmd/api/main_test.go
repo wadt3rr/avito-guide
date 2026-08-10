@@ -61,6 +61,9 @@ func (s *stubScenarioStorage) UpdateScenario(ctx context.Context, id uuid.UUID, 
 	if req.Status != nil {
 		scenario.Status = *req.Status
 	}
+	if req.Type != nil && *req.Type != scenario.Type {
+		return storage.ErrScenarioTypeImmutable
+	}
 	if req.Steps != nil {
 		scenario.Steps = *req.Steps
 	}
@@ -169,6 +172,7 @@ func TestRouter_Scenarios(t *testing.T) {
 		body         string
 		wantCode     int
 		wantTitle    string
+		wantType     models.ScenarioType
 		wantScenario bool
 	}{
 		{
@@ -186,7 +190,26 @@ func TestRouter_Scenarios(t *testing.T) {
 			body:         `{"title":"Demo","description":"desc","status":"draft","steps":[{"title":"Step 1","description":"First","content":"Click","selector":"button","action_type":"click","condition":"always","timeout_sec":5}]}`,
 			wantCode:     http.StatusCreated,
 			wantTitle:    "Demo",
+			wantType:     models.ScenarioTypeTooltip,
 			wantScenario: true,
+		},
+		{
+			name:         "create modal scenario",
+			method:       http.MethodPost,
+			path:         "/api/v1/scenarios",
+			body:         `{"title":"Modal","type":"modal","status":"draft","steps":[{"title":"Hello","content":"World","selector":"","action_type":"next","condition":"always","timeout_sec":0}]}`,
+			wantCode:     http.StatusCreated,
+			wantTitle:    "Modal",
+			wantType:     models.ScenarioTypeModal,
+			wantScenario: true,
+		},
+		{
+			name:         "reject unknown scenario type",
+			method:       http.MethodPost,
+			path:         "/api/v1/scenarios",
+			body:         `{"title":"Unknown","type":"carousel","status":"draft"}`,
+			wantCode:     http.StatusBadRequest,
+			wantScenario: false,
 		},
 		{
 			name:         "get by id returns not found for missing scenario",
@@ -224,6 +247,9 @@ func TestRouter_Scenarios(t *testing.T) {
 				if scenario.ID == uuid.Nil {
 					t.Fatal("scenario id should not be empty")
 				}
+				if scenario.Type != tt.wantType {
+					t.Fatalf("expected type %q, got %q", tt.wantType, scenario.Type)
+				}
 			}
 		})
 	}
@@ -245,6 +271,13 @@ func TestRouter_UpdateScenario(t *testing.T) {
 			wantTitle: "Updated title",
 		},
 		{
+			name:      "reject changing an existing scenario type",
+			id:        uuid.New(),
+			body:      `{"type":"banner"}`,
+			wantCode:  http.StatusConflict,
+			wantTitle: "",
+		},
+		{
 			name:      "update missing scenario",
 			id:        uuid.New(),
 			body:      `{"title":"New title"}`,
@@ -256,10 +289,11 @@ func TestRouter_UpdateScenario(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{}}
-			if tt.wantCode == http.StatusOK {
+			if tt.wantCode == http.StatusOK || tt.wantCode == http.StatusConflict {
 				store.scenarios[tt.id] = models.Scenario{
 					ID:        tt.id,
 					Title:     "Old title",
+					Type:      models.ScenarioTypeTooltip,
 					Status:    "draft",
 					CreatedAt: time.Now().UTC(),
 					UpdatedAt: time.Now().UTC(),

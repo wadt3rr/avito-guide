@@ -161,12 +161,14 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 		name          string
 		scenario      models.Scenario
 		wantTitle     string
+		wantType      models.ScenarioType
 		wantStepCount int
 	}{
 		{
 			name: "create scenario with one step",
 			scenario: models.Scenario{
 				Title:       "Test scenario",
+				Type:        models.ScenarioTypeBanner,
 				Description: ptrString("Scenario description"),
 				Status:      "draft",
 				Steps: []models.Step{{
@@ -180,6 +182,7 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 				}},
 			},
 			wantTitle:     "Test scenario",
+			wantType:      models.ScenarioTypeBanner,
 			wantStepCount: 1,
 		},
 	}
@@ -226,6 +229,10 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 
 			if retrieved.Title != tt.wantTitle {
 				t.Fatalf("expected title %q, got %q", tt.wantTitle, retrieved.Title)
+			}
+
+			if retrieved.Type != tt.wantType {
+				t.Fatalf("expected type %q, got %q", tt.wantType, retrieved.Type)
 			}
 
 			if len(retrieved.Steps) != tt.wantStepCount {
@@ -413,6 +420,33 @@ func TestStorage_UpdateScenario(t *testing.T) {
 				t.Fatalf("expected %d steps, got %d", tt.wantSteps, len(updated.Steps))
 			}
 		})
+	}
+}
+
+func TestStorage_UpdateScenarioRejectsTypeChange(t *testing.T) {
+	ctx := context.Background()
+	dsn, cleanup := setupTestDatabase(ctx, t)
+	t.Cleanup(cleanup)
+
+	store, err := NewStorage(ctx, dsn, testMigrationsPath(t))
+	if err != nil {
+		t.Fatalf("NewStorage failed: %v", err)
+	}
+	defer store.Close()
+
+	id, err := store.CreateScenario(ctx, &models.Scenario{
+		Title:  "Tooltip scenario",
+		Type:   models.ScenarioTypeTooltip,
+		Status: "draft",
+	})
+	if err != nil {
+		t.Fatalf("CreateScenario failed: %v", err)
+	}
+
+	newType := models.ScenarioTypeBanner
+	err = store.UpdateScenario(ctx, id, models.UpdateScenarioReq{Type: &newType})
+	if err != storage.ErrScenarioTypeImmutable {
+		t.Fatalf("UpdateScenario() error = %v, want %v", err, storage.ErrScenarioTypeImmutable)
 	}
 }
 

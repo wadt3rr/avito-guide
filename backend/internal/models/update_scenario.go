@@ -2,6 +2,7 @@ package models
 
 type UpdateScenarioReq struct {
 	Title        *string            `json:"title"`
+	Type         *ScenarioType      `json:"type"`
 	Description  *string            `json:"description"`
 	Status       *string            `json:"status"`
 	Published    *bool              `json:"published"`

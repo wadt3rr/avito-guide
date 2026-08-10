@@ -87,6 +87,11 @@ func runMigrations(migrationsPath, dsn string) error {
 // CreateScenario отвечает за создание нового сценария в базе данных
 func (s *Storage) CreateScenario(ctx context.Context, scenario *models.Scenario) (uuid.UUID, error) {
 	const op = "postgres.Storage.CreateScenario"
+	scenarioType, valid := models.NormalizeScenarioType(string(scenario.Type))
+	if !valid {
+		return uuid.Nil, fmt.Errorf("%s: unsupported scenario type %q", op, scenario.Type)
+	}
+	scenario.Type = scenarioType
 
 	// Запуск транзакции
 	tx, err := s.pool.Begin(ctx)
@@ -107,8 +112,8 @@ func (s *Storage) CreateScenario(ctx context.Context, scenario *models.Scenario)
 
 	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO scenarios (id, title, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`,
-		id, scenario.Title, scenario.Description, scenario.Status, now, now,
+		`INSERT INTO scenarios (id, title, type, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		id, scenario.Title, scenario.Type, scenario.Description, scenario.Status, now, now,
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%s: failed to create scenario: %w", op, err)
@@ -146,7 +151,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		`SELECT id, title, type, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         ORDER BY created_at DESC`,
 	)
@@ -163,6 +168,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 		err = rows.Scan(
 			&sc.ID,
 			&sc.Title,
+			&sc.Type,
 			&sc.Description,
 			&sc.Status,
 			&sc.PublishedAt,
@@ -204,12 +210,13 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 	var rawMatch []byte
 
 	err = tx.QueryRow(ctx, `
-        SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		SELECT id, title, type, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         WHERE id = $1
     `, id).Scan(
 		&sc.ID,
 		&sc.Title,
+		&sc.Type,
 		&sc.Description,
 		&sc.Status,
 		&sc.PublishedAt,
@@ -287,6 +294,18 @@ func (s *Storage) UpdateScenario(ctx context.Context, id uuid.UUID, req models.U
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
+	if req.Type != nil {
+		var currentType models.ScenarioType
+		if err = tx.QueryRow(ctx, `SELECT type FROM scenarios WHERE id = $1`, id).Scan(&currentType); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return storage.ErrNotFound
+			}
+			return fmt.Errorf("%s: read scenario type: %w", op, err)
+		}
+		if currentType != *req.Type {
+			return storage.ErrScenarioTypeImmutable
+		}
+	}
 	query := "UPDATE scenarios SET updated_at = $1"
 	args := []any{time.Now().UTC()}
 	argPos := 2

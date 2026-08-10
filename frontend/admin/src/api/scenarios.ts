@@ -3,6 +3,7 @@ import type {
     IScenarioStep,
     ScenarioStatus,
 } from '../data/scenarios'
+import {normalizeScenarioForSave, normalizeScenarioType} from '../data/scenarioTypes'
 
 interface IApiScenarioStep {
     id: string
@@ -20,6 +21,7 @@ interface IApiScenarioStep {
 interface IApiScenario {
     id: string
     title: string
+    type?: string
     description: string | null
     status: string
     published_at: string | null
@@ -44,6 +46,7 @@ interface IApiScenarioStepPayload {
 
 interface IApiScenarioPayload {
     title: string
+    type: IScenario['type']
     description: string
     status: ScenarioStatus
     steps: IApiScenarioStepPayload[]
@@ -91,6 +94,7 @@ const apiOrigin = (import.meta.env.VITE_API_URL ?? 'http://localhost:8081').repl
     '',
 )
 const scenariosUrl = `${apiOrigin}/api/v1/scenarios`
+const apiTimeoutMs = 10_000
 const uuidPattern =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const anchorSelectorPattern = /^\[data-onboarding-id="([^"]+)"\]$/
@@ -106,24 +110,37 @@ export class ScenarioApiError extends Error {
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(url, {
-        ...init,
-        headers: {
-            Accept: 'application/json',
-            ...(init?.body ? {'Content-Type': 'application/json'} : {}),
-            ...init?.headers,
-        },
-    })
+    const controller = new AbortController()
+    const timeoutId = globalThis.setTimeout(() => controller.abort(), apiTimeoutMs)
 
-    if (!response.ok) {
-        const responseText = await response.text()
-        throw new ScenarioApiError(
-            responseText.trim() || `API вернул ошибку ${response.status}`,
-            response.status,
-        )
+    try {
+        const response = await fetch(url, {
+            ...init,
+            signal: controller.signal,
+            headers: {
+                Accept: 'application/json',
+                ...(init?.body ? {'Content-Type': 'application/json'} : {}),
+                ...init?.headers,
+            },
+        })
+
+        if (!response.ok) {
+            const responseText = await response.text()
+            throw new ScenarioApiError(
+                responseText.trim() || `API вернул ошибку ${response.status}`,
+                response.status,
+            )
+        }
+
+        return response.json() as Promise<T>
+    } catch (error) {
+        if (controller.signal.aborted) {
+            throw new ScenarioApiError('API не ответило за 10 секунд.', 408)
+        }
+        throw error
+    } finally {
+        globalThis.clearTimeout(timeoutId)
     }
-
-    return response.json() as Promise<T>
 }
 
 function toScenarioStatus(scenario: IApiScenario): ScenarioStatus {
@@ -159,17 +176,18 @@ function apiStepToScenarioStep(step: IApiScenarioStep): IScenarioStep {
 function apiScenarioToScenario(scenario: IApiScenario): IScenario {
     const status = toScenarioStatus(scenario)
 
-    return {
+    return normalizeScenarioForSave({
         id: scenario.id,
+        type: normalizeScenarioType(scenario.type),
         title: scenario.title,
         description: scenario.description ?? '',
-        path: scenario.url_pattern === '*' ? '' : scenario.url_pattern,
+        path: !scenario.url_pattern || scenario.url_pattern === '*' ? '' : scenario.url_pattern,
         status,
         canOpen: status === 'published',
         steps: [...(scenario.steps ?? [])]
             .sort((firstStep, secondStep) => firstStep.step_order - secondStep.step_order)
             .map(apiStepToScenarioStep),
-    }
+    })
 }
 
 function scenarioStepToPayload(
@@ -191,11 +209,13 @@ function scenarioStepToPayload(
 }
 
 function scenarioToPayload(scenario: IScenario): IApiScenarioPayload {
+    const normalizedScenario = normalizeScenarioForSave(scenario)
     return {
-        title: scenario.title.trim(),
-        description: scenario.description.trim(),
-        status: scenario.status,
-        steps: scenario.steps.map(scenarioStepToPayload),
+        title: normalizedScenario.title.trim(),
+        type: normalizedScenario.type,
+        description: normalizedScenario.description.trim(),
+        status: normalizedScenario.status,
+        steps: normalizedScenario.steps.map(scenarioStepToPayload),
     }
 }
 
@@ -209,6 +229,10 @@ export async function getScenarios(): Promise<IScenario[]> {
 }
 
 export async function getScenarioById(id: string): Promise<IScenario> {
+    if (!uuidPattern.test(id)) {
+        throw new ScenarioApiError('Некорректный идентификатор сценария.', 400)
+    }
+
     const scenario = await request<IApiScenario>(`${scenariosUrl}/${id}`)
     return apiScenarioToScenario(scenario)
 }

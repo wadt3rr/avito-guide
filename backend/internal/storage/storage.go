@@ -9,6 +9,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrScenarioTypeImmutable = errors.New("scenario type cannot be changed after creation")
 
 type ScenarioStorage interface {
 	CreateScenario(ctx context.Context, scenario *models.Scenario) (uuid.UUID, error)
