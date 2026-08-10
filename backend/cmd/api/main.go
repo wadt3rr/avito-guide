@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/wadt3rr/avito-guide/backend/internal/config"
 	"github.com/wadt3rr/avito-guide/backend/internal/models"
+	"github.com/wadt3rr/avito-guide/backend/internal/report"
 	"github.com/wadt3rr/avito-guide/backend/internal/storage"
 	"github.com/wadt3rr/avito-guide/backend/internal/storage/postgres"
 )
@@ -137,6 +138,13 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "title is required", http.StatusBadRequest)
 				return
 			}
+			if scenario.Type == "" {
+				scenario.Type = models.ScenarioTooltip
+			}
+			if !scenario.Type.Valid() {
+				http.Error(w, "invalid scenario type", http.StatusBadRequest)
+				return
+			}
 
 			id, err := store.CreateScenario(req.Context(), &scenario)
 			if err != nil {
@@ -167,6 +175,10 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
 			}
+			if updateReq.Type != nil && !updateReq.Type.Valid() {
+				http.Error(w, "invalid scenario type", http.StatusBadRequest)
+				return
+			}
 
 			if err := store.UpdateScenario(req.Context(), id, updateReq); err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
@@ -185,6 +197,26 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusOK, scenario)
+		})
+
+		r.Delete("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+
+			if err := store.DeleteScenario(req.Context(), id); err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "scenario not found", http.StatusNotFound)
+					return
+				}
+				log.Error("failed to delete scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to delete scenario", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusNoContent)
 		})
 
 		r.Get("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
@@ -279,8 +311,52 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 					log.Error("failed to get analytics scenario", slog.String("error", err.Error()))
 					return
 				}
+				log.Error("failed to get scenario analytics", slog.String("error", err.Error()))
+				http.Error(w, "failed to get scenario analytics", http.StatusInternalServerError)
+				return
 			}
 			writeJSON(w, http.StatusOK, analytics)
+		})
+
+		r.Get("/scenarios/{id}/analytics/report", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+
+			scenario, err := store.GetScenarioByID(req.Context(), id)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "scenario not found", http.StatusNotFound)
+					return
+				}
+				log.Error("failed to get report scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
+				return
+			}
+
+			analytics, err := store.GetScenarioAnalytics(req.Context(), id)
+			if err != nil {
+				log.Error("failed to get report analytics", slog.String("error", err.Error()))
+				http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
+				return
+			}
+
+			document, err := report.AnalyticsPDF(scenario, analytics)
+			if err != nil {
+				log.Error("failed to render analytics report", slog.String("error", err.Error()))
+				http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/pdf")
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="analytics-%s.pdf"`, id))
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(document)))
+			w.WriteHeader(http.StatusOK)
+			if _, err := w.Write(document); err != nil {
+				log.Error("failed to write analytics report", slog.String("error", err.Error()))
+			}
 		})
 
 		r.Route("/embed", func(r chi.Router) {

@@ -98,17 +98,25 @@ func (s *Storage) CreateScenario(ctx context.Context, scenario *models.Scenario)
 	}()
 
 	// Создание сценария
-	id, err := uuid.NewV7()
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("%s: failed to create scenario id: %w", op, err)
+	id := scenario.ID
+	if id == uuid.Nil {
+		id, err = uuid.NewV7()
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("%s: failed to create scenario id: %w", op, err)
+		}
+	}
+
+	scenarioType := scenario.Type
+	if scenarioType == "" {
+		scenarioType = models.ScenarioTooltip
 	}
 
 	now := time.Now().UTC()
 
 	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO scenarios (id, title, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)`,
-		id, scenario.Title, scenario.Description, scenario.Status, now, now,
+		`INSERT INTO scenarios (id, type, title, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		id, scenarioType, scenario.Title, scenario.Description, scenario.Status, now, now,
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%s: failed to create scenario: %w", op, err)
@@ -146,7 +154,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		`SELECT id, type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         ORDER BY created_at DESC`,
 	)
@@ -162,6 +170,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 		var rawMatch []byte
 		err = rows.Scan(
 			&sc.ID,
+			&sc.Type,
 			&sc.Title,
 			&sc.Description,
 			&sc.Status,
@@ -204,11 +213,12 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 	var rawMatch []byte
 
 	err = tx.QueryRow(ctx, `
-        SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		SELECT id, type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         WHERE id = $1
-    `, id).Scan(
+	`, id).Scan(
 		&sc.ID,
+		&sc.Type,
 		&sc.Title,
 		&sc.Description,
 		&sc.Status,
@@ -296,6 +306,11 @@ func (s *Storage) UpdateScenario(ctx context.Context, id uuid.UUID, req models.U
 		args = append(args, *req.Title)
 		argPos++
 	}
+	if req.Type != nil {
+		query += fmt.Sprintf(", type = $%d", argPos)
+		args = append(args, *req.Type)
+		argPos++
+	}
 	if req.Description != nil {
 		query += fmt.Sprintf(", description = $%d", argPos)
 		args = append(args, *req.Description)
@@ -355,6 +370,20 @@ func (s *Storage) UpdateScenario(ctx context.Context, id uuid.UUID, req models.U
 
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("%s: commit: %w", op, err)
+	}
+
+	return nil
+}
+
+func (s *Storage) DeleteScenario(ctx context.Context, id uuid.UUID) error {
+	const op = "postgres.Storage.DeleteScenario"
+
+	tag, err := s.pool.Exec(ctx, `DELETE FROM scenarios WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("%s: delete scenario: %w", op, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return storage.ErrNotFound
 	}
 
 	return nil

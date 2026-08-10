@@ -55,6 +55,9 @@ func (s *stubScenarioStorage) UpdateScenario(ctx context.Context, id uuid.UUID, 
 	if req.Title != nil {
 		scenario.Title = *req.Title
 	}
+	if req.Type != nil {
+		scenario.Type = *req.Type
+	}
 	if req.Description != nil {
 		scenario.Description = req.Description
 	}
@@ -66,6 +69,14 @@ func (s *stubScenarioStorage) UpdateScenario(ctx context.Context, id uuid.UUID, 
 	}
 	scenario.UpdatedAt = time.Now().UTC()
 	s.scenarios[id] = scenario
+	return nil
+}
+
+func (s *stubScenarioStorage) DeleteScenario(ctx context.Context, id uuid.UUID) error {
+	if _, ok := s.scenarios[id]; !ok {
+		return storage.ErrNotFound
+	}
+	delete(s.scenarios, id)
 	return nil
 }
 
@@ -284,6 +295,75 @@ func TestRouter_UpdateScenario(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRouter_PersistsScenarioType(t *testing.T) {
+	store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{}}
+	router := newRouter(store, setupLogger(envLocal))
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/scenarios",
+		strings.NewReader(`{"title":"Важное сообщение","type":"modal","status":"draft"}`),
+	)
+	res := httptest.NewRecorder()
+
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, res.Code, res.Body.String())
+	}
+
+	var scenario models.Scenario
+	if err := json.Unmarshal(res.Body.Bytes(), &scenario); err != nil {
+		t.Fatalf("decode scenario: %v", err)
+	}
+	if scenario.Type != models.ScenarioModal {
+		t.Fatalf("expected modal type, got %q", scenario.Type)
+	}
+}
+
+func TestRouter_DeleteScenario(t *testing.T) {
+	scenarioID := uuid.New()
+	store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{
+		scenarioID: {ID: scenarioID, Title: "Удаляемый сценарий"},
+	}}
+	router := newRouter(store, setupLogger(envLocal))
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/scenarios/"+scenarioID.String(), nil)
+	res := httptest.NewRecorder()
+
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusNoContent, res.Code, res.Body.String())
+	}
+	if _, ok := store.scenarios[scenarioID]; ok {
+		t.Fatal("scenario should be deleted")
+	}
+}
+
+func TestRouter_AnalyticsReport(t *testing.T) {
+	scenarioID := uuid.New()
+	store := &stubScenarioStorage{
+		scenarios: map[uuid.UUID]models.Scenario{
+			scenarioID: {ID: scenarioID, Title: "Первая доставка", Type: models.ScenarioTooltip},
+		},
+		analytics: []models.CreateEventReq{
+			{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventStarted},
+			{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventFinished},
+		},
+	}
+	router := newRouter(store, setupLogger(envLocal))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/scenarios/"+scenarioID.String()+"/analytics/report", nil)
+	res := httptest.NewRecorder()
+
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, res.Code, res.Body.String())
+	}
+	if contentType := res.Header().Get("Content-Type"); contentType != "application/pdf" {
+		t.Fatalf("expected PDF content type, got %q", contentType)
+	}
+	if !strings.HasPrefix(res.Body.String(), "%PDF-") {
+		t.Fatal("expected a PDF document")
 	}
 }
 

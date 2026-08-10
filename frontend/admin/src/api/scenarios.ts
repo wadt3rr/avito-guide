@@ -137,7 +137,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
             )
         }
 
-        return response.json() as Promise<T>
+		if (response.status === 204) {
+			return undefined as T
+		}
+
+		return response.json() as Promise<T>
     } catch (error) {
         if (controller.signal.aborted) {
             throw new ScenarioApiError('API не ответило за 10 секунд.', 408)
@@ -240,6 +244,14 @@ export async function getScenarioById(id: string): Promise<IScenario> {
 
     const scenario = await request<IApiScenario>(`${scenariosUrl}/${id}`)
     return apiScenarioToScenario(scenario)
+}
+
+export async function deleteScenario(id: string): Promise<void> {
+	if (!uuidPattern.test(id)) {
+		throw new ScenarioApiError('Некорректный идентификатор сценария.', 400)
+	}
+
+	await request<void>(`${scenariosUrl}/${id}`, {method: 'DELETE'})
 }
 
 export async function getScenarioAnalytics(

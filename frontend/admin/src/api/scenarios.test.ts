@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import {
+  deleteScenario,
   getScenarioAnalyticsReport,
   getScenarioById,
   getScenarios,
@@ -12,6 +13,19 @@ afterEach(() => {
 })
 
 describe('scenario API boundary', () => {
+  it('deletes a scenario through the backend API', async () => {
+    const scenarioId = '123e4567-e89b-42d3-a456-426614174000'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, {status: 204}))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await deleteScenario(scenarioId)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8081/api/v1/scenarios/${scenarioId}`,
+      expect.objectContaining({method: 'DELETE'}),
+    )
+  })
+
   it('downloads the analytics PDF for the requested scenario id', async () => {
     const scenarioId = '123e4567-e89b-42d3-a456-426614174000'
     const pdf = new Blob(['%PDF-report'], {type: 'application/pdf'})

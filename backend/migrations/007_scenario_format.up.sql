@@ -1,0 +1,2 @@
+ALTER TABLE scenarios
+    ADD COLUMN IF NOT EXISTS format VARCHAR(20) NOT NULL DEFAULT 'tooltip';

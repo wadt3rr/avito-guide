@@ -7,6 +7,7 @@ import {
 import {Button} from '../../components/Button/Button'
 import {
     createScenario,
+    deleteScenario,
     getScenarioById,
     type ScenarioPublicationAction,
     ScenarioApiError,
@@ -76,6 +77,7 @@ export function ScenarioEditorPage() {
     const [savedScenario, setSavedScenario] = useState<IScenario>(emptyScenario)
     const [isLoading, setIsLoading] = useState(Boolean(scenarioId))
     const [isSaving, setIsSaving] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
     const [loadError, setLoadError] = useState('')
     const [canRetryLoad, setCanRetryLoad] = useState(true)
     const [saveError, setSaveError] = useState('')
@@ -84,7 +86,7 @@ export function ScenarioEditorPage() {
     const [selectedStep, setSelectedStep] = useState<ISelectedStep | null>(null)
     const isDirty = JSON.stringify(scenario) !== JSON.stringify(savedScenario)
 
-    useUnsavedChangesWarning(isDirty && !isSaving)
+    useUnsavedChangesWarning(isDirty && !isSaving && !isDeleting)
 
     useEffect(() => {
         if (!scenarioId) return
@@ -246,6 +248,28 @@ export function ScenarioEditorPage() {
         )
     }
 
+    const handleDeleteScenario = async () => {
+        if (!scenario.id || isDeleting) return
+
+        const confirmed = window.confirm(
+            `Удалить сценарий «${scenario.title}»? Шаги, прогресс и аналитика будут удалены безвозвратно.`,
+        )
+        if (!confirmed) return
+
+        setIsDeleting(true)
+        setSaveError('')
+        setNotice('')
+
+        try {
+            await deleteScenario(scenario.id)
+            navigate('/scenarios', {replace: true})
+        } catch {
+            setSaveError('Не удалось удалить сценарий. Попробуйте ещё раз.')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     const handleDetailsChange = (
         field: 'description' | 'path' | 'title',
         value: string,
@@ -394,14 +418,14 @@ export function ScenarioEditorPage() {
                         <div className="scenario-editor-page__actions">
                             <Button
                                 className="scenario-editor-page__secondary-action"
-                                disabled={isSaving}
+                                disabled={isSaving || isDeleting}
                                 onClick={handleSave}
                                 variant="secondary"
                             >
                                 Сохранить
                             </Button>
                             <Button
-                                disabled={isSaving}
+                                disabled={isSaving || isDeleting}
                                 onClick={handlePublication}
                                 variant={scenario.status === 'published' ? 'secondary' : 'primary'}
                             >
@@ -448,7 +472,13 @@ export function ScenarioEditorPage() {
 
                     {scenario.id && (
                         <div className="scenario-editor-page__delete-action">
-                            <Button variant="danger">Удалить сценарий</Button>
+                            <Button
+                                disabled={isDeleting || isSaving}
+                                onClick={() => void handleDeleteScenario()}
+                                variant="danger"
+                            >
+                                {isDeleting ? 'Удаляем…' : 'Удалить сценарий'}
+                            </Button>
                         </div>
                     )}
                 </div>

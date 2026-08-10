@@ -6,8 +6,26 @@ import (
 	"github.com/google/uuid"
 )
 
+type ScenarioType string
+
+const (
+	ScenarioTooltip ScenarioType = "tooltip"
+	ScenarioModal   ScenarioType = "modal"
+	ScenarioBanner  ScenarioType = "banner"
+)
+
+func (t ScenarioType) Valid() bool {
+	switch t {
+	case ScenarioTooltip, ScenarioModal, ScenarioBanner:
+		return true
+	default:
+		return false
+	}
+}
+
 type Scenario struct {
 	ID           uuid.UUID         `json:"id"`
+	Type         ScenarioType      `json:"type"`
 	Title        string            `json:"title"`
 	Description  *string           `json:"description"`
 	Status       string            `json:"status"`

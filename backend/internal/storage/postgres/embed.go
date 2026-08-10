@@ -30,7 +30,7 @@ func (s *Storage) ResolveScenario(ctx context.Context, req models.ResolveRequest
 	var rawMatch []byte
 
 	err = s.pool.QueryRow(ctx, `
-        SELECT id, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		SELECT id, type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         WHERE published_at IS NOT NULL
           AND $1 LIKE replace(url_pattern, '*', '%')
@@ -38,7 +38,7 @@ func (s *Storage) ResolveScenario(ctx context.Context, req models.ResolveRequest
         ORDER BY priority DESC, published_at DESC
         LIMIT 1
     `, req.URL, string(factsJSON)).Scan(
-		&sc.ID, &sc.Title, &sc.Description, &sc.Status, &sc.PublishedAt,
+		&sc.ID, &sc.Type, &sc.Title, &sc.Description, &sc.Status, &sc.PublishedAt,
 		&sc.URLPattern, &rawMatch, &sc.Priority, &sc.CreatedAt, &sc.UpdatedAt,
 	)
 	if err != nil {

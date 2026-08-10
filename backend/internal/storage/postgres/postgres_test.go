@@ -46,13 +46,8 @@ func testPostgresDSN(t *testing.T) string {
 	return dsn
 }
 
-func dsnToURL(t *testing.T, dsn string) string {
+func dsnToURL(t *testing.T, cfg *pgx.ConnConfig) string {
 	t.Helper()
-	cfg, err := pgx.ParseConfig(dsn)
-
-	if err != nil {
-		t.Fatalf("unable to parse postgres dsn: %v", err)
-	}
 
 	u := &url.URL{
 		Scheme: "postgres",
@@ -95,7 +90,7 @@ func setupTestDatabase(ctx context.Context, t *testing.T) (string, func()) {
 
 	adminCfg := *cfg
 	adminCfg.Database = "postgres"
-	adminDSN := dsnToURL(t, adminCfg.ConnString())
+	adminDSN := dsnToURL(t, &adminCfg)
 	adminPool, err := pgxpool.New(ctx, adminDSN)
 
 	if err != nil {
@@ -103,7 +98,10 @@ func setupTestDatabase(ctx context.Context, t *testing.T) (string, func()) {
 	}
 
 	testDB := fmt.Sprintf("avito_test_%s", strings.ReplaceAll(uuid.NewString(), "-", "_"))
-	if _, err := adminPool.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s", pgx.Identifier{testDB}.Sanitize())); err != nil {
+	if _, err := adminPool.Exec(ctx, fmt.Sprintf(
+		"CREATE DATABASE %s TEMPLATE template0",
+		pgx.Identifier{testDB}.Sanitize(),
+	)); err != nil {
 		adminPool.Close()
 		t.Fatalf("failed to create test database %q: %v", testDB, err)
 	}
@@ -114,7 +112,7 @@ func setupTestDatabase(ctx context.Context, t *testing.T) (string, func()) {
 	}
 
 	cfg.Database = testDB
-	testDSN := dsnToURL(t, cfg.ConnString())
+	testDSN := dsnToURL(t, cfg)
 	return testDSN, cleanup
 }
 
@@ -166,6 +164,7 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 		{
 			name: "create scenario with one step",
 			scenario: models.Scenario{
+				Type:        models.ScenarioBanner,
 				Title:       "Test scenario",
 				Description: ptrString("Scenario description"),
 				Status:      "draft",
@@ -218,6 +217,9 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 			if scenarios[0].Title != tt.wantTitle {
 				t.Fatalf("expected title %q, got %q", tt.wantTitle, scenarios[0].Title)
 			}
+			if scenarios[0].Type != models.ScenarioBanner {
+				t.Fatalf("expected banner type, got %q", scenarios[0].Type)
+			}
 
 			retrieved, err := store.GetScenarioByID(ctx, id)
 			if err != nil {
@@ -226,6 +228,9 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 
 			if retrieved.Title != tt.wantTitle {
 				t.Fatalf("expected title %q, got %q", tt.wantTitle, retrieved.Title)
+			}
+			if retrieved.Type != models.ScenarioBanner {
+				t.Fatalf("expected banner type, got %q", retrieved.Type)
 			}
 
 			if len(retrieved.Steps) != tt.wantStepCount {
@@ -320,6 +325,7 @@ func TestStorage_UpdateScenario(t *testing.T) {
 		wantErr    error
 		wantTitle  string
 		wantStatus string
+		wantType   models.ScenarioType
 		wantSteps  int
 	}{
 		{
@@ -335,6 +341,7 @@ func TestStorage_UpdateScenario(t *testing.T) {
 			prepare: true,
 			req: models.UpdateScenarioReq{
 				Title:  ptrString("Updated scenario"),
+				Type:   ptrScenarioType(models.ScenarioModal),
 				Status: ptrString("active"),
 				Steps: &[]models.Step{{
 					Title:      "Updated step",
@@ -348,6 +355,7 @@ func TestStorage_UpdateScenario(t *testing.T) {
 			wantErr:    nil,
 			wantTitle:  "Updated scenario",
 			wantStatus: "active",
+			wantType:   models.ScenarioModal,
 			wantSteps:  1,
 		},
 	}
@@ -408,11 +416,86 @@ func TestStorage_UpdateScenario(t *testing.T) {
 			if updated.Status != tt.wantStatus {
 				t.Fatalf("expected status %q, got %q", tt.wantStatus, updated.Status)
 			}
+			if updated.Type != tt.wantType {
+				t.Fatalf("expected type %q, got %q", tt.wantType, updated.Type)
+			}
 
 			if len(updated.Steps) != tt.wantSteps {
 				t.Fatalf("expected %d steps, got %d", tt.wantSteps, len(updated.Steps))
 			}
 		})
+	}
+}
+
+func TestStorage_DeleteScenarioCascade(t *testing.T) {
+	ctx := context.Background()
+	dsn, cleanup := setupTestDatabase(ctx, t)
+	t.Cleanup(cleanup)
+
+	store, err := NewStorage(ctx, dsn, testMigrationsPath(t))
+	if err != nil {
+		t.Fatalf("NewStorage failed: %v", err)
+	}
+	defer store.Close()
+
+	scenarioID := uuid.New()
+	_, err = store.CreateScenario(ctx, &models.Scenario{
+		ID:     scenarioID,
+		Type:   models.ScenarioTooltip,
+		Title:  "Delete me",
+		Status: "draft",
+		Steps: []models.Step{{
+			Title:      "Step",
+			Content:    "Complete it",
+			Selector:   "#target",
+			ActionType: "next",
+			Condition:  "always",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("CreateScenario failed: %v", err)
+	}
+
+	created, err := store.GetScenarioByID(ctx, scenarioID)
+	if err != nil {
+		t.Fatalf("GetScenarioByID failed: %v", err)
+	}
+	if len(created.Steps) != 1 {
+		t.Fatalf("expected one step, got %d", len(created.Steps))
+	}
+
+	_, err = store.UpsertProgress(ctx, scenarioID, models.UpsertProgressReq{
+		SessionID: "delete-session",
+		Status:    ptrProgressStatus(models.ProgressInProgress),
+	})
+	if err != nil {
+		t.Fatalf("UpsertProgress failed: %v", err)
+	}
+	if err := store.CreateAnalyticsEvent(ctx, models.CreateEventReq{
+		ScenarioID: scenarioID,
+		SessionID:  "delete-session",
+		StepID:     &created.Steps[0].ID,
+		EventType:  models.EventStepCompleted,
+	}); err != nil {
+		t.Fatalf("CreateAnalyticsEvent failed: %v", err)
+	}
+
+	if err := store.DeleteScenario(ctx, scenarioID); err != nil {
+		t.Fatalf("DeleteScenario failed: %v", err)
+	}
+	if _, err := store.GetScenarioByID(ctx, scenarioID); err != storage.ErrNotFound {
+		t.Fatalf("expected ErrNotFound after delete, got %v", err)
+	}
+
+	for _, table := range []string{"steps", "user_scenario_progress", "analytics_events"} {
+		var count int
+		query := fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE scenario_id = $1", pgx.Identifier{table}.Sanitize())
+		if err := store.pool.QueryRow(ctx, query, scenarioID).Scan(&count); err != nil {
+			t.Fatalf("count %s rows: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("expected %s rows to be deleted, got %d", table, count)
+		}
 	}
 }
 
@@ -507,5 +590,9 @@ func ptrInt(value int) *int {
 }
 
 func ptrProgressStatus(value models.ProgressStatus) *models.ProgressStatus {
+	return &value
+}
+
+func ptrScenarioType(value models.ScenarioType) *models.ScenarioType {
 	return &value
 }
