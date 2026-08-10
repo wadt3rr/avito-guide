@@ -61,5 +61,18 @@ services:
     volumes:
       - ./frontend/widget:/app
 
+  admin:
+    build:
+      context: ./frontend/admin
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:8081
+    ports:
+      - '5174:5174'
+    volumes:
+      - ./frontend/admin:/app
+
 volumes:
   db-data:
