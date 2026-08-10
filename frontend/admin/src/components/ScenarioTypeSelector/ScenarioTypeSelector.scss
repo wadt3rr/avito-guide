@@ -1,0 +1,80 @@
+@use '../../styles/tokens' as tokens;
+@use '../../styles/mixins' as mixins;
+
+.scenario-type-selector {
+  padding: 0;
+  margin: 0;
+  border: 0;
+
+  legend {
+    padding: 0;
+    margin-bottom: 10px;
+    color: tokens.$color-ink-soft;
+    font: 700 12.5px/16px tokens.$font-ui;
+  }
+
+  &__options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  &__hint {
+    margin: 9px 0 0;
+    color: tokens.$color-ink-faint;
+    font: 500 11.5px/17px tokens.$font-ui;
+  }
+
+  @media (max-width: 600px) {
+    &__options {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+.scenario-type-option {
+  min-height: 86px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 10px;
+  color: tokens.$color-ink-soft;
+  background: tokens.$color-surface;
+  border: 1px solid tokens.$color-border;
+  border-radius: tokens.$radius-card;
+  font: 700 13px/18px tokens.$font-ui;
+  cursor: pointer;
+  transition: 150ms ease;
+  transition-property: color, background-color, border-color, box-shadow;
+
+  input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:hover {
+    color: tokens.$color-accent;
+    border-color: rgb(0 144 222 / 38%);
+  }
+
+  &:has(input:focus-visible) {
+    @include mixins.focus-ring;
+  }
+
+  &--selected {
+    color: tokens.$color-accent;
+    background: rgb(0 144 222 / 7%);
+    border-color: tokens.$color-accent;
+    box-shadow: 0 0 0 1px tokens.$color-accent;
+  }
+
+  &:has(input:disabled) {
+    cursor: default;
+  }
+}

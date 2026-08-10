@@ -15,13 +15,23 @@ import {
 import {Icon} from '../../components/Icon/Icon'
 import {ScenarioDetailsForm} from '../../components/ScenarioDetailsForm/ScenarioDetailsForm'
 import {ScenarioSteps} from '../../components/ScenarioSteps/ScenarioSteps'
+import {ScenarioTypeSelector} from '../../components/ScenarioTypeSelector/ScenarioTypeSelector'
 import {Sidebar} from '../../components/Sidebar/Sidebar'
+import {StandaloneScenarioContent} from '../../components/StandaloneScenarioContent/StandaloneScenarioContent'
 import {StepEditorDrawer} from '../../components/StepEditorDrawer/StepEditorDrawer'
+import {WidgetPreview} from '../../components/WidgetPreview/WidgetPreview'
+import {
+    changeScenarioType,
+    normalizeScenarioForSave,
+    validateScenario,
+} from '../../data/scenarioTypes'
 import {
     createEmptyStep,
     type IScenario,
     type IScenarioStep,
+    type ScenarioType,
 } from '../../data/scenarios'
+import {useUnsavedChangesWarning} from '../../hooks/useUnsavedChangesWarning'
 import './ScenarioEditorPage.scss'
 
 interface ISelectedStep {
@@ -31,6 +41,7 @@ interface ISelectedStep {
 
 const emptyScenario: IScenario = {
     id: '',
+    type: 'tooltip',
     title: '',
     description: '',
     path: '',
@@ -38,17 +49,42 @@ const emptyScenario: IScenario = {
     steps: [],
 }
 
+function describeLoadError(error: unknown) {
+    if (error instanceof ScenarioApiError && error.status === 400) {
+        return {
+            message: 'Некорректная ссылка на сценарий.',
+            canRetry: false,
+        }
+    }
+    if (error instanceof ScenarioApiError && error.status === 408) {
+        return {
+            message: 'API не ответило за 10 секунд. Попробуйте ещё раз.',
+            canRetry: true,
+        }
+    }
+
+    return {
+        message: 'Не удалось загрузить сценарий. Проверьте подключение к API.',
+        canRetry: true,
+    }
+}
+
 export function ScenarioEditorPage() {
     const navigate = useNavigate()
     const {scenarioId} = useParams<{ scenarioId: string }>()
     const [scenario, setScenario] = useState<IScenario>(emptyScenario)
+    const [savedScenario, setSavedScenario] = useState<IScenario>(emptyScenario)
     const [isLoading, setIsLoading] = useState(Boolean(scenarioId))
     const [isSaving, setIsSaving] = useState(false)
     const [loadError, setLoadError] = useState('')
+    const [canRetryLoad, setCanRetryLoad] = useState(true)
     const [saveError, setSaveError] = useState('')
     const [notFound, setNotFound] = useState(false)
     const [notice, setNotice] = useState('')
     const [selectedStep, setSelectedStep] = useState<ISelectedStep | null>(null)
+    const isDirty = JSON.stringify(scenario) !== JSON.stringify(savedScenario)
+
+    useUnsavedChangesWarning(isDirty && !isSaving)
 
     useEffect(() => {
         if (!scenarioId) return
@@ -57,7 +93,10 @@ export function ScenarioEditorPage() {
 
         void getScenarioById(scenarioId)
             .then((loadedScenario) => {
-                if (!cancelled) setScenario(loadedScenario)
+                if (!cancelled) {
+                    setScenario(loadedScenario)
+                    setSavedScenario(loadedScenario)
+                }
             })
             .catch((error: unknown) => {
                 if (cancelled) return
@@ -65,7 +104,9 @@ export function ScenarioEditorPage() {
                 if (error instanceof ScenarioApiError && error.status === 404) {
                     setNotFound(true)
                 } else {
-                    setLoadError('Не удалось загрузить сценарий. Проверьте подключение к API.')
+                    const loadFailure = describeLoadError(error)
+                    setLoadError(loadFailure.message)
+                    setCanRetryLoad(loadFailure.canRetry)
                 }
             })
             .finally(() => {
@@ -82,15 +123,20 @@ export function ScenarioEditorPage() {
 
         setIsLoading(true)
         setLoadError('')
+        setCanRetryLoad(true)
         setNotFound(false)
 
         try {
-            setScenario(await getScenarioById(scenarioId))
+            const loadedScenario = await getScenarioById(scenarioId)
+            setScenario(loadedScenario)
+            setSavedScenario(loadedScenario)
         } catch (error) {
             if (error instanceof ScenarioApiError && error.status === 404) {
                 setNotFound(true)
             } else {
-                setLoadError('Не удалось загрузить сценарий. Проверьте подключение к API.')
+                const loadFailure = describeLoadError(error)
+                setLoadError(loadFailure.message)
+                setCanRetryLoad(loadFailure.canRetry)
             }
         } finally {
             setIsLoading(false)
@@ -154,8 +200,13 @@ export function ScenarioEditorPage() {
     const persistScenario = async (
         publicationAction?: ScenarioPublicationAction,
     ) => {
-        if (!scenario.title.trim()) {
-            setSaveError('Введите название сценария.')
+        const normalizedScenario = normalizeScenarioForSave(scenario)
+        const validationError = validateScenario(
+            normalizedScenario,
+            publicationAction === 'publish' ? 'publish' : 'save',
+        )
+        if (validationError) {
+            setSaveError(validationError)
             return
         }
 
@@ -164,11 +215,12 @@ export function ScenarioEditorPage() {
         setNotice('')
 
         try {
-            const savedScenario = scenario.id
-                ? await updateScenario(scenario, publicationAction)
-                : await createScenario(scenario, publicationAction === 'publish')
+            const savedScenario = normalizedScenario.id
+                ? await updateScenario(normalizedScenario, publicationAction)
+                : await createScenario(normalizedScenario, publicationAction === 'publish')
 
             setScenario(savedScenario)
+            setSavedScenario(savedScenario)
             navigate(`/scenarios/${savedScenario.id}`, {replace: true})
             setNotice(
                 publicationAction === 'publish'
@@ -201,6 +253,21 @@ export function ScenarioEditorPage() {
         setScenario((currentScenario) => ({
             ...currentScenario,
             [field]: value,
+        }))
+        setNotice('')
+        setSaveError('')
+    }
+
+    const handleTypeChange = (type: ScenarioType) => {
+        setScenario((currentScenario) => changeScenarioType(currentScenario, type))
+        setNotice('')
+        setSaveError('')
+    }
+
+    const handleStandaloneContentChange = (step: IScenarioStep) => {
+        setScenario((currentScenario) => ({
+            ...currentScenario,
+            steps: [{...step, target: '', timeout: '0'}],
         }))
         setNotice('')
         setSaveError('')
@@ -268,9 +335,11 @@ export function ScenarioEditorPage() {
                     <div className="scenario-editor-page__state" role="alert">
                         <p>{loadError}</p>
                         <div className="scenario-editor-page__state-actions">
-                            <Button onClick={() => void retryLoadScenario()} variant="secondary">
-                                Повторить
-                            </Button>
+                            {canRetryLoad && (
+                                <Button onClick={() => void retryLoadScenario()} variant="secondary">
+                                    Повторить
+                                </Button>
+                            )}
                             <Button onClick={() => navigate('/scenarios')}>
                                 Все сценарии
                             </Button>
@@ -345,6 +414,15 @@ export function ScenarioEditorPage() {
                         </div>
                     </header>
 
+                    <div className="scenario-editor-page__experience">
+                        <ScenarioTypeSelector
+                            disabled={Boolean(scenario.id)}
+                            onChange={handleTypeChange}
+                            value={scenario.type}
+                        />
+                        <WidgetPreview scenario={scenario}/>
+                    </div>
+
                     <div className="scenario-editor-page__sections">
                         <ScenarioDetailsForm
                             description={scenario.description}
@@ -352,12 +430,20 @@ export function ScenarioEditorPage() {
                             path={scenario.path}
                             title={scenario.title}
                         />
-                        <ScenarioSteps
-                            onAddStep={addStep}
-                            onReorder={reorderSteps}
-                            onSelectStep={openStepEditor}
-                            steps={scenario.steps}
-                        />
+                        {scenario.type === 'tooltip' ? (
+                            <ScenarioSteps
+                                onAddStep={addStep}
+                                onReorder={reorderSteps}
+                                onSelectStep={openStepEditor}
+                                steps={scenario.steps}
+                            />
+                        ) : (
+                            <StandaloneScenarioContent
+                                onChange={handleStandaloneContentChange}
+                                step={scenario.steps[0]}
+                                type={scenario.type}
+                            />
+                        )}
                     </div>
 
                     {scenario.id && (
