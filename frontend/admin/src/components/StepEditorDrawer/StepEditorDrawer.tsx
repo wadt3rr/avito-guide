@@ -15,17 +15,36 @@ interface IStepEditorDrawer {
 }
 
 const customTargetValue = '__custom__'
-const onboardingIdPattern = /\[data-onboarding-id="([^"]*)"\]/
+const anchorSelectorPattern = /\[data-onboarding-id="([^"]*)"\]\s*$/
 
-function getOnboardingId(target: string) {
-  return getAnchorById(target)?.id ?? onboardingIdPattern.exec(target)?.[1] ?? target
+interface ITargetParts {
+    scope: string
+    anchorId: string
 }
 
-function updateOnboardingId(target: string, onboardingId: string) {
-  const attribute = `[data-onboarding-id="${onboardingId}"]`
-  return onboardingIdPattern.test(target)
-    ? target.replace(onboardingIdPattern, attribute)
-    : onboardingId
+function splitTarget(target: string): ITargetParts {
+    const match = anchorSelectorPattern.exec(target)
+    if (!match) return {anchorId: target.trim(), scope: ''}
+
+    return {anchorId: match[1], scope: target.slice(0, match.index).trim()}
+}
+
+function toPreviewSelector({anchorId, scope}: ITargetParts) {
+    const value = anchorId.trim()
+    if (!value) return ''
+
+    const isRawSelector =
+        value.startsWith('.') || value.startsWith('#') || value.startsWith('[')
+    const anchorSelector = isRawSelector
+        ? value
+        : `[data-onboarding-id="${value}"]`
+    const parentScope = scope.trim()
+
+    return parentScope ? `${parentScope} ${anchorSelector}` : anchorSelector
+}
+
+function joinTarget(parts: ITargetParts) {
+    return parts.scope.trim() ? toPreviewSelector(parts) : parts.anchorId.trim()
 }
 
 export function StepEditorDrawer({
@@ -40,12 +59,15 @@ export function StepEditorDrawer({
     const closeButtonRef = useRef<HTMLButtonElement>(null)
     const [title, setTitle] = useState(step.title)
     const [text, setText] = useState(step.text)
-    const [selectedTarget, setSelectedTarget] = useState(step.target)
+    const initialTarget = splitTarget(step.target)
+    const [scope, setScope] = useState(initialTarget.scope)
+    const [anchorId, setAnchorId] = useState(initialTarget.anchorId)
     const [isCustomTarget, setIsCustomTarget] = useState(
-        !getAnchorById(step.target),
+        !getAnchorById(initialTarget.anchorId),
     )
     const [timeout, setTimeout] = useState(step.timeout)
-    const anchorGroups = getAnchorGroups(scenarioPath, selectedTarget)
+    const anchorGroups = getAnchorGroups(scenarioPath, anchorId)
+    const previewSelector = toPreviewSelector({anchorId, scope})
 
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
@@ -153,18 +175,15 @@ export function StepEditorDrawer({
                             className="drawer-field__control"
                             onChange={(event) => {
                                 const value = event.target.value
-                                setIsCustomTarget(value === customTargetValue)
                                 if (value === customTargetValue) {
-                                    if (getAnchorById(selectedTarget)) {
-                                        setSelectedTarget(
-                                            `[data-onboarding-id="${selectedTarget}"]`,
-                                        )
-                                    }
-                                } else {
-                                    setSelectedTarget(value)
+                                    setIsCustomTarget(true)
+                                    return
                                 }
+
+                                setIsCustomTarget(false)
+                                setAnchorId(value)
                             }}
-                            value={isCustomTarget ? customTargetValue : selectedTarget}
+                            value={isCustomTarget ? customTargetValue : anchorId}
                         >
                             {anchorGroups.map((anchorGroup) => (
                                 <optgroup key={anchorGroup.label} label={anchorGroup.label}>
@@ -177,35 +196,49 @@ export function StepEditorDrawer({
                             ))}
               <option value={customTargetValue}>Ввести data-onboarding-id вручную</option>
                         </select>
-                        {!isCustomTarget && (
-                            <span className="drawer-field__hint drawer-field__hint--code">
-                [data-onboarding-id=&quot;{selectedTarget}&quot;]
-              </span>
-                        )}
                     </label>
 
-          {isCustomTarget && (
-            <label className="drawer-field">
-              <span className="drawer-field__attribute">
-                <strong>data-onboarding-id=</strong>
-                <input
-                  aria-label="Значение data-onboarding-id"
-                  autoComplete="off"
-                  onChange={(event) =>
-                    setSelectedTarget(
-                      updateOnboardingId(selectedTarget, event.target.value),
-                    )
-                  }
-                  placeholder="form-title"
-                  type="text"
-                  value={getOnboardingId(selectedTarget)}
-                />
-              </span>
-              <span className="drawer-field__hint">
-                Введите только значение атрибута, например form-title.
-              </span>
-            </label>
-          )}
+                    {isCustomTarget && (
+                        <label className="drawer-field">
+                            <span className="drawer-field__attribute">
+                                <strong>data-onboarding-id=</strong>
+                                <input
+                                    aria-label="Значение data-onboarding-id"
+                                    autoComplete="off"
+                                    onChange={(event) => setAnchorId(event.target.value)}
+                                    placeholder="form-title"
+                                    type="text"
+                                    value={anchorId}
+                                />
+                            </span>
+                            <span className="drawer-field__hint">
+                                Введите только значение атрибута, например form-title.
+                            </span>
+                        </label>
+                    )}
+
+                    <label className="drawer-field">
+                        <span className="drawer-field__label">Ограничение области</span>
+                        <input
+                            autoComplete="off"
+                            className="drawer-field__control"
+                            onChange={(event) => setScope(event.target.value)}
+                            placeholder='[data-vertical="jobs"]'
+                            type="text"
+                            value={scope}
+                        />
+                        <span className="drawer-field__hint">
+                            CSS-селектор родителя. Нужен, когда подходящих элементов на
+                            странице несколько. Пусто — искать по всей странице.
+                        </span>
+                    </label>
+
+                    <div className="drawer-field">
+                        <span className="drawer-field__label">Итоговый селектор</span>
+                        <span className="drawer-field__hint drawer-field__hint--code">
+                            {previewSelector || '—'}
+                        </span>
+                    </div>
 
                     <label className="drawer-field">
                         <span className="drawer-field__label">Таймаут поиска, сек</span>
@@ -230,7 +263,7 @@ export function StepEditorDrawer({
                         onClick={() =>
                             onSave({
                                 ...step,
-                                target: selectedTarget,
+                                target: joinTarget({anchorId, scope}),
                                 text,
                                 timeout,
                                 title,
