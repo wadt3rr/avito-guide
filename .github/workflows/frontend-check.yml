@@ -12,12 +12,12 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  demo-and-widget:
+  frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       matrix:
-        project: [demo, widget]
+        project: [demo, widget, admin]
 
     defaults:
       run:
@@ -41,7 +41,7 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm test
+        run: npm run test --if-present
 
       - name: Build
         run: npm run build
