@@ -1,4 +1,5 @@
 export type ScenarioStatus = 'published' | 'draft'
+export type ScenarioType = 'tooltip' | 'modal' | 'banner'
 
 export interface IScenarioStep {
   id: string
@@ -10,6 +11,7 @@ export interface IScenarioStep {
 
 export interface IScenario {
   id: string
+  type: ScenarioType
   title: string
   description: string
   path: string

@@ -61,7 +61,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 32px;
-    margin-bottom: 64px;
+    margin-bottom: 32px;
   }
 
   &__title-group {
@@ -171,6 +171,18 @@
     gap: 72px;
   }
 
+  &__experience {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    padding: 22px;
+    margin-bottom: 64px;
+    background: tokens.$color-surface;
+    border: 1px solid tokens.$color-border;
+    border-radius: tokens.$radius-card;
+    box-shadow: tokens.$shadow-card;
+  }
+
   &__delete-action {
     display: flex;
     justify-content: flex-end;
@@ -181,7 +193,7 @@
   @media (max-width: 860px) {
     &__header {
       flex-direction: column;
-      margin-bottom: 52px;
+      margin-bottom: 28px;
     }
 
     &__actions {

@@ -1,3 +1,7 @@
+import {
+  MAX_SCENARIO_DESCRIPTION_LENGTH,
+  MAX_SCENARIO_TITLE_LENGTH,
+} from '../../data/scenarioTypes'
 import './ScenarioDetailsForm.scss'
 
 interface IScenarioDetailsForm {
@@ -26,6 +30,7 @@ export function ScenarioDetailsForm({
           <input
             autoComplete="off"
             className="scenario-field__control"
+            maxLength={MAX_SCENARIO_TITLE_LENGTH}
             onChange={(event) => onChange('title', event.target.value)}
             placeholder="Введите название"
             type="text"
@@ -38,6 +43,7 @@ export function ScenarioDetailsForm({
           <textarea
             autoComplete="off"
             className="scenario-field__control scenario-field__control--textarea"
+            maxLength={MAX_SCENARIO_DESCRIPTION_LENGTH}
             onChange={(event) => onChange('description', event.target.value)}
             placeholder="Кратко опишите сценарий"
             rows={4}

@@ -4,14 +4,17 @@ export type IconName =
   | 'add'
   | 'analytics'
   | 'arrow-left'
+  | 'banner'
   | 'close'
   | 'grip'
   | 'link'
   | 'list'
   | 'logout'
+  | 'modal'
   | 'scenarios'
   | 'search'
   | 'settings'
+  | 'tooltip'
 
 export const iconPaths: Record<IconName, ReactNode> = {
   add: <path d="M12 5v14M5 12h14" />,
@@ -27,6 +30,12 @@ export const iconPaths: Record<IconName, ReactNode> = {
     <>
       <path d="m15 18-6-6 6-6" />
       <path d="M9 12h11" />
+    </>
+  ),
+  banner: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M7 6.5h.01M10 6.5h.01" />
     </>
   ),
   close: (
@@ -63,6 +72,12 @@ export const iconPaths: Record<IconName, ReactNode> = {
       <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />
     </>
   ),
+  modal: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <rect x="7" y="7" width="10" height="10" rx="1.5" />
+    </>
+  ),
   scenarios: (
     <>
       <rect x="3" y="4" width="6" height="6" rx="1" />
@@ -80,6 +95,13 @@ export const iconPaths: Record<IconName, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.58 1.7 1.7 0 0 0 10 3h4v.08a1.7 1.7 0 0 0 1.05 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.42 9 1.7 1.7 0 0 0 21 10v4h-.08A1.7 1.7 0 0 0 19.4 15Z" />
+    </>
+  ),
+  tooltip: (
+    <>
+      <path d="M4 5h7a3 3 0 0 1 3 3v8" />
+      <path d="m10 13 4 4 4-4" />
+      <circle cx="4" cy="5" r="1.5" />
     </>
   ),
 }

@@ -68,7 +68,7 @@ export function ScenariosPage() {
 
                     {isLoading && (
                         <p className="scenarios-page__state" role="status">
-                            Загружаем сценарии…
+                            Загрузка
                         </p>
                     )}
 
@@ -85,7 +85,6 @@ export function ScenariosPage() {
                     <section aria-label="Список сценариев" className="scenarios-grid">
                         {scenarios.map((scenario) => (
                             <ScenariosCard
-                                canOpen={scenario.canOpen}
                                 id={scenario.id}
                                 key={scenario.id}
                                 path={scenario.path}

@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react'
 import {Link} from 'react-router-dom'
 import {
     getScenarioAnalytics,
+    getScenarioAnalyticsReport,
     getScenarios,
     type IScenarioAnalytics,
 } from '../../api/scenarios'
@@ -44,6 +45,8 @@ export function AnalyticsPage() {
     const [analyticsError, setAnalyticsError] = useState(false)
     const [scenariosReloadKey, setScenariosReloadKey] = useState(0)
     const [analyticsReloadKey, setAnalyticsReloadKey] = useState(0)
+    const [isReportLoading, setIsReportLoading] = useState(false)
+    const [reportError, setReportError] = useState(false)
 
     useEffect(() => {
         let cancelled = false
@@ -110,8 +113,32 @@ export function AnalyticsPage() {
     const selectScenario = (scenarioId: string) => {
         setAnalytics(null)
         setAnalyticsError(false)
+        setReportError(false)
         setIsAnalyticsLoading(true)
         setSelectedScenarioId(scenarioId)
+    }
+
+    const downloadReport = async () => {
+        if (!selectedScenarioId || isReportLoading) return
+
+        setIsReportLoading(true)
+        setReportError(false)
+
+        try {
+            const {blob, filename} = await getScenarioAnalyticsReport(selectedScenarioId)
+            const objectUrl = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = objectUrl
+            link.download = filename
+            document.body.append(link)
+            link.click()
+            link.remove()
+            globalThis.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+        } catch {
+            setReportError(true)
+        } finally {
+            setIsReportLoading(false)
+        }
     }
 
     const retryLoad = () => {
@@ -166,13 +193,32 @@ export function AnalyticsPage() {
                                     </select>
                                 </span>
                             </label>
+                            <div className="analytics-page__report-actions">
+                                <Button
+                                    disabled={isLoading || isReportLoading}
+                                    onClick={() => void downloadReport()}
+                                    variant="secondary"
+                                >
+                                    {isReportLoading
+                                        ? 'Формируем отчёт…'
+                                        : 'Получить отчёт в PDF'}
+                                </Button>
+                                {reportError && (
+                                    <span
+                                        className="analytics-page__report-error"
+                                        role="alert"
+                                    >
+                                        Не удалось получить PDF. Попробуйте ещё раз.
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     )}
 
                     {isLoading && (
                         <div className="analytics-page__state" role="status">
                             <span className="analytics-page__spinner"/>
-                            <p>Загружаем аналитику…</p>
+                            <p>Загрузка</p>
                         </div>
                     )}
 
