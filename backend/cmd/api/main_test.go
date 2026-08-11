@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/wadt3rr/avito-guide/backend/internal/auth"
 	"github.com/wadt3rr/avito-guide/backend/internal/models"
 	"github.com/wadt3rr/avito-guide/backend/internal/storage"
 )
@@ -20,6 +21,16 @@ type stubScenarioStorage struct {
 	scenarios  map[uuid.UUID]models.Scenario
 	progresses map[string]models.Progress
 	analytics  []models.CreateEventReq
+	users      map[uuid.UUID]models.User
+}
+
+func newStubStorage() *stubScenarioStorage {
+	return &stubScenarioStorage{
+		scenarios:  make(map[uuid.UUID]models.Scenario),
+		progresses: make(map[string]models.Progress),
+		analytics:  make([]models.CreateEventReq, 0),
+		users:      make(map[uuid.UUID]models.User),
+	}
 }
 
 func (s *stubScenarioStorage) CreateScenario(ctx context.Context, scenario *models.Scenario) (uuid.UUID, error) {
@@ -52,18 +63,23 @@ func (s *stubScenarioStorage) UpdateScenario(ctx context.Context, id uuid.UUID, 
 	if !ok {
 		return storage.ErrNotFound
 	}
+
 	if req.Title != nil {
 		scenario.Title = *req.Title
 	}
+
 	if req.Type != nil {
 		scenario.Type = *req.Type
 	}
+
 	if req.Description != nil {
 		scenario.Description = req.Description
 	}
+
 	if req.Status != nil {
 		scenario.Status = *req.Status
 	}
+
 	if req.Steps != nil {
 		scenario.Steps = *req.Steps
 	}
@@ -76,6 +92,7 @@ func (s *stubScenarioStorage) DeleteScenario(ctx context.Context, id uuid.UUID) 
 	if _, ok := s.scenarios[id]; !ok {
 		return storage.ErrNotFound
 	}
+
 	delete(s.scenarios, id)
 	return nil
 }
@@ -85,6 +102,7 @@ func (s *stubScenarioStorage) GetProgress(ctx context.Context, scenarioID uuid.U
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
+
 	return &progress, nil
 }
 
@@ -103,6 +121,7 @@ func (s *stubScenarioStorage) UpsertProgress(ctx context.Context, scenarioID uui
 	if req.Status != nil {
 		progress.Status = *req.Status
 	}
+
 	if req.CurrentStep != nil {
 		progress.CurrentStep = *req.CurrentStep
 	}
@@ -121,6 +140,7 @@ func (s *stubScenarioStorage) GetScenarioAnalytics(ctx context.Context, scenario
 		if event.ScenarioID != scenarioID {
 			continue
 		}
+
 		switch event.EventType {
 		case models.EventStarted:
 			analytics.Started++
@@ -130,9 +150,11 @@ func (s *stubScenarioStorage) GetScenarioAnalytics(ctx context.Context, scenario
 			analytics.Skipped++
 		}
 	}
+
 	if analytics.Started > 0 {
 		analytics.Conversion = float64(analytics.Finished) / float64(analytics.Started) * 100
 	}
+
 	return analytics, nil
 }
 
@@ -140,6 +162,7 @@ func (s *stubScenarioStorage) CreateAnalyticsEvent(ctx context.Context, req mode
 	if req.SessionID == "" {
 		return errors.New("session_id is required")
 	}
+
 	s.analytics = append(s.analytics, req)
 	return nil
 }
@@ -154,9 +177,11 @@ func (s *stubScenarioStorage) ResolveScenario(ctx context.Context, req models.Re
 		if scenario.PublishedAt == nil {
 			continue
 		}
+
 		if scenario.URLPattern != "*" && scenario.URLPattern != req.URL {
 			continue
 		}
+
 		matched := true
 		for key, want := range scenario.MatchContext {
 			if req.Context[key] != want {
@@ -164,12 +189,41 @@ func (s *stubScenarioStorage) ResolveScenario(ctx context.Context, req models.Re
 				break
 			}
 		}
+
 		if matched {
 			found := scenario
 			return &found, nil
 		}
 	}
 	return nil, storage.ErrNotFound
+}
+
+// --- Новые методы для пользователей ---
+
+func (s *stubScenarioStorage) CreateUser(ctx context.Context, user *models.User) (uuid.UUID, error) {
+	id := uuid.New()
+	user.ID = id
+	user.CreatedAt = time.Now().UTC()
+	user.UpdatedAt = user.CreatedAt
+	s.users[id] = *user
+	return id, nil
+}
+
+func (s *stubScenarioStorage) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
+	for _, u := range s.users {
+		if u.Email == email {
+			return &u, nil
+		}
+	}
+	return nil, storage.ErrNotFound
+}
+
+func (s *stubScenarioStorage) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
+	u, ok := s.users[id]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+	return &u, nil
 }
 
 func TestRouter_Scenarios(t *testing.T) {
@@ -211,7 +265,7 @@ func TestRouter_Scenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{}}
+			store := newStubStorage()
 			router := newRouter(store, setupLogger(envLocal))
 
 			var req *http.Request
@@ -266,7 +320,7 @@ func TestRouter_UpdateScenario(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{}}
+			store := newStubStorage()
 			if tt.wantCode == http.StatusOK {
 				store.scenarios[tt.id] = models.Scenario{
 					ID:        tt.id,
@@ -299,7 +353,7 @@ func TestRouter_UpdateScenario(t *testing.T) {
 }
 
 func TestRouter_PersistsScenarioType(t *testing.T) {
-	store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{}}
+	store := newStubStorage()
 	router := newRouter(store, setupLogger(envLocal))
 	req := httptest.NewRequest(
 		http.MethodPost,
@@ -317,6 +371,7 @@ func TestRouter_PersistsScenarioType(t *testing.T) {
 	if err := json.Unmarshal(res.Body.Bytes(), &scenario); err != nil {
 		t.Fatalf("decode scenario: %v", err)
 	}
+
 	if scenario.Type != models.ScenarioModal {
 		t.Fatalf("expected modal type, got %q", scenario.Type)
 	}
@@ -324,9 +379,9 @@ func TestRouter_PersistsScenarioType(t *testing.T) {
 
 func TestRouter_DeleteScenario(t *testing.T) {
 	scenarioID := uuid.New()
-	store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{
-		scenarioID: {ID: scenarioID, Title: "Удаляемый сценарий"},
-	}}
+	store := newStubStorage()
+	store.scenarios[scenarioID] = models.Scenario{ID: scenarioID, Title: "Удаляемый сценарий"}
+
 	router := newRouter(store, setupLogger(envLocal))
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/scenarios/"+scenarioID.String(), nil)
 	res := httptest.NewRecorder()
@@ -342,15 +397,13 @@ func TestRouter_DeleteScenario(t *testing.T) {
 
 func TestRouter_AnalyticsReport(t *testing.T) {
 	scenarioID := uuid.New()
-	store := &stubScenarioStorage{
-		scenarios: map[uuid.UUID]models.Scenario{
-			scenarioID: {ID: scenarioID, Title: "Первая доставка", Type: models.ScenarioTooltip},
-		},
-		analytics: []models.CreateEventReq{
-			{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventStarted},
-			{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventFinished},
-		},
+	store := newStubStorage()
+	store.scenarios[scenarioID] = models.Scenario{ID: scenarioID, Title: "Первая доставка", Type: models.ScenarioTooltip}
+	store.analytics = []models.CreateEventReq{
+		{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventStarted},
+		{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventFinished},
 	}
+
 	router := newRouter(store, setupLogger(envLocal))
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/scenarios/"+scenarioID.String()+"/analytics/report", nil)
 	res := httptest.NewRecorder()
@@ -359,16 +412,18 @@ func TestRouter_AnalyticsReport(t *testing.T) {
 	if res.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, res.Code, res.Body.String())
 	}
+
 	if contentType := res.Header().Get("Content-Type"); contentType != "application/pdf" {
 		t.Fatalf("expected PDF content type, got %q", contentType)
 	}
+
 	if !strings.HasPrefix(res.Body.String(), "%PDF-") {
 		t.Fatal("expected a PDF document")
 	}
 }
 
 func TestNewRouter_InvalidJSON(t *testing.T) {
-	store := &stubScenarioStorage{scenarios: map[uuid.UUID]models.Scenario{}, progresses: map[string]models.Progress{}, analytics: []models.CreateEventReq{}}
+	store := newStubStorage()
 	router := newRouter(store, setupLogger(envLocal))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/scenarios", strings.NewReader("{bad json}"))
@@ -378,6 +433,7 @@ func TestNewRouter_InvalidJSON(t *testing.T) {
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, res.Code, res.Body.String())
 	}
+
 	if !strings.Contains(res.Body.String(), "invalid request body") && !strings.Contains(res.Body.String(), "failed") {
 		t.Fatal("expected validation error message")
 	}
@@ -428,11 +484,9 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			store := &stubScenarioStorage{
-				scenarios:  map[uuid.UUID]models.Scenario{scenarioID: {ID: scenarioID, Title: "Demo", Status: "draft"}},
-				progresses: map[string]models.Progress{},
-				analytics:  []models.CreateEventReq{},
-			}
+			store := newStubStorage()
+			store.scenarios[scenarioID] = models.Scenario{ID: scenarioID, Title: "Demo", Status: "draft"}
+
 			router := newRouter(store, setupLogger(envLocal))
 
 			var req *http.Request
@@ -447,8 +501,95 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 			if res.Code != tt.wantCode {
 				t.Fatalf("expected status %d, got %d: %s", tt.wantCode, res.Code, res.Body.String())
 			}
+
 			if tt.wantContains != "" && !strings.Contains(res.Body.String(), tt.wantContains) {
 				t.Fatalf("expected response to contain %q, got %q", tt.wantContains, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestRouter_Auth(t *testing.T) {
+	validEmail := "user@example.com"
+	validPassword := "secure123"
+	hashedPassword, _ := auth.HashPassword(validPassword)
+	existingUserID := uuid.New()
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		body       string
+		wantCode   int
+		setupStore func(store *stubScenarioStorage)
+	}{
+		{
+			name:     "register success",
+			method:   http.MethodPost,
+			path:     "/api/v1/auth/register",
+			body:     `{"email":"new@example.com","password":"password123"}`,
+			wantCode: http.StatusCreated,
+		},
+		{
+			name:     "register missing fields",
+			method:   http.MethodPost,
+			path:     "/api/v1/auth/register",
+			body:     `{"email":"","password":""}`,
+			wantCode: http.StatusBadRequest,
+		},
+		{
+			name:     "login success",
+			method:   http.MethodPost,
+			path:     "/api/v1/auth/login",
+			body:     fmt.Sprintf(`{"email":"%s","password":"%s"}`, validEmail, validPassword),
+			wantCode: http.StatusOK,
+			setupStore: func(store *stubScenarioStorage) {
+				store.users[existingUserID] = models.User{
+					ID:           existingUserID,
+					Email:        validEmail,
+					PasswordHash: hashedPassword,
+					Role:         models.UserRoleAdmin,
+				}
+			},
+		},
+		{
+			name:     "login incorrect password",
+			method:   http.MethodPost,
+			path:     "/api/v1/auth/login",
+			body:     fmt.Sprintf(`{"email":"%s","password":"wrongpassword"}`, validEmail),
+			wantCode: http.StatusUnauthorized,
+			setupStore: func(store *stubScenarioStorage) {
+				store.users[existingUserID] = models.User{
+					ID:           existingUserID,
+					Email:        validEmail,
+					PasswordHash: hashedPassword,
+				}
+			},
+		},
+		{
+			name:     "login non-existent user",
+			method:   http.MethodPost,
+			path:     "/api/v1/auth/login",
+			body:     `{"email":"notfound@example.com","password":"password123"}`,
+			wantCode: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newStubStorage()
+			if tt.setupStore != nil {
+				tt.setupStore(store)
+			}
+
+			router := newRouter(store, setupLogger(envLocal))
+			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			res := httptest.NewRecorder()
+
+			router.ServeHTTP(res, req)
+
+			if res.Code != tt.wantCode {
+				t.Fatalf("expected status %d, got %d: %s", tt.wantCode, res.Code, res.Body.String())
 			}
 		})
 	}
