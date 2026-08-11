@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"github.com/wadt3rr/avito-guide/backend/internal/auth"
 	"github.com/wadt3rr/avito-guide/backend/internal/config"
 	"github.com/wadt3rr/avito-guide/backend/internal/models"
 	"github.com/wadt3rr/avito-guide/backend/internal/report"
@@ -357,6 +358,88 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 			if _, err := w.Write(document); err != nil {
 				log.Error("failed to write analytics report", slog.String("error", err.Error()))
 			}
+		})
+
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", func(w http.ResponseWriter, req *http.Request) {
+				var payload struct {
+					Email    string `json:"email"`
+					Password string `json:"password"`
+				}
+
+				if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
+				}
+
+				if strings.TrimSpace(payload.Email) == "" || strings.TrimSpace(payload.Password) == "" {
+					http.Error(w, "email and password are required", http.StatusBadRequest)
+					return
+				}
+
+				hash, err := auth.HashPassword(payload.Password)
+				if err != nil {
+					log.Error("failed to hash password", slog.String("error", err.Error()))
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				user := models.User{
+					Email:        payload.Email,
+					PasswordHash: hash,
+					Role:         models.UserRoleAdmin,
+					CreatedAt:    time.Now().UTC(),
+					UpdatedAt:    time.Now().UTC(),
+				}
+
+				id, err := store.CreateUser(req.Context(), &user)
+				if err != nil {
+					log.Error("failed to create user", slog.String("error", err.Error()))
+					http.Error(w, "failed to create user", http.StatusInternalServerError)
+					return
+				}
+
+				writeJSON(w, http.StatusCreated, map[string]string{"id": id.String()})
+			})
+
+			r.Post("/login", func(w http.ResponseWriter, req *http.Request) {
+				var payload struct {
+					Email    string `json:"email"`
+					Password string `json:"password"`
+				}
+
+				if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
+				}
+
+				user, err := store.GetUserByEmail(req.Context(), payload.Email)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "invalid credentials", http.StatusUnauthorized)
+						return
+					}
+
+					log.Error("failed to get user", slog.String("error", err.Error()))
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				if !auth.CheckPasswordHash(payload.Password, user.PasswordHash) {
+					http.Error(w, "invalid credentials", http.StatusUnauthorized)
+					return
+				}
+
+				// TODO: Секрет лучше брать из конфига, пока захардкодим для примера
+				token, err := auth.NewToken("super-secret-key", *user, 24*time.Hour)
+				if err != nil {
+					log.Error("failed to generate token", slog.String("error", err.Error()))
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				writeJSON(w, http.StatusOK, map[string]string{"token": token})
+			})
 		})
 
 		r.Route("/embed", func(r chi.Router) {

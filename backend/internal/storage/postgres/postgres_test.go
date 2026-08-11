@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -576,6 +577,108 @@ func TestStorage_ProgressAndAnalytics(t *testing.T) {
 			}
 			if tt.assert != nil {
 				tt.assert(t, ctx, store)
+			}
+		})
+	}
+}
+
+func TestStorage_Users(t *testing.T) {
+	cases := []struct {
+		name    string
+		prepare func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string)
+		assert  func(t *testing.T, ctx context.Context, store *Storage, id uuid.UUID, email string)
+	}{
+		{
+			name: "create and get user success",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				id := uuid.New()
+				email := "testuser@example.com"
+
+				_, err := store.CreateUser(ctx, &models.User{
+					ID:           id,
+					Email:        email,
+					PasswordHash: "hashed_password_123",
+					Role:         "user",
+					CreatedAt:    time.Now().UTC(),
+					UpdatedAt:    time.Now().UTC(),
+				})
+				if err != nil {
+					t.Fatalf("CreateUser failed: %v", err)
+				}
+
+				return id, email
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, id uuid.UUID, email string) {
+				u1, err := store.GetUserByEmail(ctx, email)
+				if err != nil {
+					t.Fatalf("GetUserByEmail failed: %v", err)
+				}
+
+				if u1.ID != id {
+					t.Fatalf("GetUserByEmail: expected id %s, got %s", id, u1.ID)
+				}
+
+				if u1.Email != email {
+					t.Fatalf("GetUserByEmail: expected email %s, got %s", email, u1.Email)
+				}
+
+				u2, err := store.GetUserByID(ctx, id)
+				if err != nil {
+					t.Fatalf("GetUserByID failed: %v", err)
+				}
+
+				if u2.Email != email {
+					t.Fatalf("GetUserByID: expected email %s, got %s", email, u2.Email)
+				}
+			},
+		},
+		{
+			name: "get user by email not found",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				return uuid.New(), "missing@example.com"
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, _ uuid.UUID, email string) {
+				_, err := store.GetUserByEmail(ctx, email)
+				if err != storage.ErrNotFound {
+					t.Fatalf("expected ErrNotFound, got %v", err)
+				}
+			},
+		},
+		{
+			name: "get user by id not found",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				return uuid.New(), "doesntmatter@example.com"
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, id uuid.UUID, _ string) {
+				_, err := store.GetUserByID(ctx, id)
+				if err != storage.ErrNotFound {
+					t.Fatalf("expected ErrNotFound, got %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			dsn, cleanup := setupTestDatabase(ctx, t)
+			t.Cleanup(cleanup)
+
+			store, err := NewStorage(ctx, dsn, testMigrationsPath(t))
+			if err != nil {
+				t.Fatalf("NewStorage failed: %v", err)
+			}
+			defer store.Close()
+
+			var id uuid.UUID
+			var email string
+
+			if tt.prepare != nil {
+				id, email = tt.prepare(t, ctx, store)
+			}
+
+			if tt.assert != nil {
+				tt.assert(t, ctx, store, id, email)
 			}
 		})
 	}
