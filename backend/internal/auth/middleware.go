@@ -34,7 +34,7 @@ func Auth(jwtSecret string) func(http.Handler) http.Handler {
 				Email: claims.Email,
 				Role:  claims.Role,
 			}
-			ctx := context.WithValue(r.Context(), UserContextKey, &user)
+			ctx := context.WithValue(r.Context(), UserContextKey, user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

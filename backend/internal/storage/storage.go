@@ -23,10 +23,10 @@ type ScenarioStorage interface {
 	ResolveScenario(ctx context.Context, req models.ResolveRequest) (*models.Scenario, error)
 	CreateAnalyticsEvents(ctx context.Context, events []models.CreateEventReq) error
 
-	//Auth
+	// Auth
 	CreateUser(ctx context.Context, user *models.User) (uuid.UUID, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
-	//ListUsers(ctx context.Context) ([]models.User, error)
-	//DeleteUser(ctx context.Context, id uuid.UUID) error
+	// ListUsers(ctx context.Context) ([]models.User, error)
+	// DeleteUser(ctx context.Context, id uuid.UUID) error
 }
