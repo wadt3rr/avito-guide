@@ -52,6 +52,19 @@ CREATE TABLE analytics_events (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE users (
+    id            UUID PRIMARY KEY,
+    email         VARCHAR(255) NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          VARCHAR(20) NOT NULL DEFAULT 'admin',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT admins_role_check CHECK (role IN ('superadmin', 'admin'))
+);
+
+CREATE INDEX admins_email_idx ON users (email);
+
 CREATE INDEX scenarios_published_idx
     ON scenarios (published_at)
     WHERE published_at IS NOT NULL;
