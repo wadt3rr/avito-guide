@@ -56,9 +56,15 @@ func run() error {
 	}
 	defer storageDB.Close()
 
+	//Инициализация суперадмина
+	err = ensureSuperAdmin(ctx, storageDB, cfg.SuperAdmin.Email, cfg.SuperAdmin.Password, cfg.Env)
+	if err != nil {
+		return fmt.Errorf("failed to init superadmin: %w", err)
+	}
+
 	server := &http.Server{
 		Addr:              cfg.HTTPServer.Address,
-		Handler:           withCORS(newRouter(storageDB, log), cfg.HTTPServer.CORSAllowedOrigins),
+		Handler:           withCORS(newRouter(storageDB, log, cfg.JWTSecret), cfg.HTTPServer.CORSAllowedOrigins),
 		ReadHeaderTimeout: cfg.HTTPServer.Timeout,
 		ReadTimeout:       cfg.HTTPServer.Timeout,
 		WriteTimeout:      cfg.HTTPServer.Timeout,
@@ -91,355 +97,50 @@ func run() error {
 	return nil
 }
 
-func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
+func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/scenarios", func(w http.ResponseWriter, req *http.Request) {
-			scenarios, err := store.GetScenarios(req.Context())
-			if err != nil {
-				log.Error("failed to get scenarios", slog.String("error", err.Error()))
-				http.Error(w, "failed to get scenarios", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, http.StatusOK, scenarios)
-		})
-
-		r.Get("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
+		//Public handlers
+		r.Post("/auth/login", func(w http.ResponseWriter, req *http.Request) {
+			var payload struct {
+				Email    string `json:"email"`
+				Password string `json:"password"`
 			}
 
-			scenario, err := store.GetScenarioByID(req.Context(), id)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					return
-				}
-				log.Error("failed to get scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to get scenario", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, http.StatusOK, scenario)
-		})
-
-		r.Post("/scenarios", func(w http.ResponseWriter, req *http.Request) {
-			var scenario models.Scenario
-			if err := json.NewDecoder(req.Body).Decode(&scenario); err != nil {
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
 				http.Error(w, "invalid request body", http.StatusBadRequest)
 				return
 			}
 
-			if strings.TrimSpace(scenario.Title) == "" {
-				http.Error(w, "title is required", http.StatusBadRequest)
-				return
-			}
-			if scenario.Type == "" {
-				scenario.Type = models.ScenarioTooltip
-			}
-			if !scenario.Type.Valid() {
-				http.Error(w, "invalid scenario type", http.StatusBadRequest)
-				return
-			}
-
-			id, err := store.CreateScenario(req.Context(), &scenario)
-			if err != nil {
-				log.Error("failed to create scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to create scenario", http.StatusInternalServerError)
-				return
-			}
-
-			created, err := store.GetScenarioByID(req.Context(), id)
-			if err != nil {
-				log.Error("failed to get created scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to get created scenario", http.StatusInternalServerError)
-				return
-			}
-
-			writeJSON(w, http.StatusCreated, created)
-		})
-
-		r.Patch("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
-			}
-
-			var updateReq models.UpdateScenarioReq
-			if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
-				http.Error(w, "invalid request body", http.StatusBadRequest)
-				return
-			}
-			if updateReq.Type != nil && !updateReq.Type.Valid() {
-				http.Error(w, "invalid scenario type", http.StatusBadRequest)
-				return
-			}
-
-			if err := store.UpdateScenario(req.Context(), id, updateReq); err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					return
-				}
-				log.Error("failed to update scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to update scenario", http.StatusInternalServerError)
-				return
-			}
-
-			scenario, err := store.GetScenarioByID(req.Context(), id)
-			if err != nil {
-				log.Error("failed to fetch updated scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to fetch updated scenario", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, http.StatusOK, scenario)
-		})
-
-		r.Delete("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
-			}
-
-			if err := store.DeleteScenario(req.Context(), id); err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					return
-				}
-				log.Error("failed to delete scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to delete scenario", http.StatusInternalServerError)
-				return
-			}
-
-			w.WriteHeader(http.StatusNoContent)
-		})
-
-		r.Get("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
-			}
-
-			sessionID := req.URL.Query().Get("session_id")
-			if sessionID == "" {
-				sessionID = chi.URLParam(req, "session_id")
-			}
-
-			progress, err := store.GetProgress(req.Context(), id, sessionID)
+			user, err := store.GetUserByEmail(req.Context(), payload.Email)
 			if err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					return
-				}
-			}
-			writeJSON(w, http.StatusOK, progress)
-		})
-
-		r.Put("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
-			}
-			var updateReq models.UpsertProgressReq
-			if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
-				http.Error(w, "invalid request body", http.StatusBadRequest)
-				return
-			}
-			progress, err := store.UpsertProgress(req.Context(), id, updateReq)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					return
-				}
-				log.Error("failed to update scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to update scenario", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, http.StatusOK, progress)
-		})
-
-		r.Post("/analytics/events", func(w http.ResponseWriter, req *http.Request) {
-			var CreateEventReq models.CreateEventReq
-			if err := json.NewDecoder(req.Body).Decode(&CreateEventReq); err != nil {
-				http.Error(w, "invalid request body", http.StatusBadRequest)
-				return
-			}
-			if CreateEventReq.SessionID == "" {
-				http.Error(w, "session_id is required", http.StatusBadRequest)
-				return
-			}
-			if CreateEventReq.ScenarioID == uuid.Nil {
-				http.Error(w, "scenario_id is required", http.StatusBadRequest)
-				return
-			}
-			if CreateEventReq.EventType == "" {
-				http.Error(w, "event_type is required", http.StatusBadRequest)
-				return
-			}
-
-			if !CreateEventReq.EventType.Valid() {
-				http.Error(w, "invalid event type", http.StatusBadRequest)
-				return
-			}
-
-			if err := store.CreateAnalyticsEvent(req.Context(), CreateEventReq); err != nil {
-				log.Error("failed to create analytics event", slog.String("error", err.Error()))
-				http.Error(w, "failed to create analytics event", http.StatusInternalServerError)
-				return
-			}
-
-			writeJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
-		})
-
-		r.Get("/scenarios/{id}/analytics", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
-			}
-			analytics, err := store.GetScenarioAnalytics(req.Context(), id)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					log.Error("failed to get analytics scenario", slog.String("error", err.Error()))
-					return
-				}
-				log.Error("failed to get scenario analytics", slog.String("error", err.Error()))
-				http.Error(w, "failed to get scenario analytics", http.StatusInternalServerError)
-				return
-			}
-			writeJSON(w, http.StatusOK, analytics)
-		})
-
-		r.Get("/scenarios/{id}/analytics/report", func(w http.ResponseWriter, req *http.Request) {
-			id, err := uuid.Parse(chi.URLParam(req, "id"))
-			if err != nil {
-				http.Error(w, "invalid scenario id", http.StatusBadRequest)
-				return
-			}
-
-			scenario, err := store.GetScenarioByID(req.Context(), id)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					http.Error(w, "scenario not found", http.StatusNotFound)
-					return
-				}
-				log.Error("failed to get report scenario", slog.String("error", err.Error()))
-				http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
-				return
-			}
-
-			analytics, err := store.GetScenarioAnalytics(req.Context(), id)
-			if err != nil {
-				log.Error("failed to get report analytics", slog.String("error", err.Error()))
-				http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
-				return
-			}
-
-			document, err := report.AnalyticsPDF(scenario, analytics)
-			if err != nil {
-				log.Error("failed to render analytics report", slog.String("error", err.Error()))
-				http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/pdf")
-			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="analytics-%s.pdf"`, id))
-			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(document)))
-			w.WriteHeader(http.StatusOK)
-			if _, err := w.Write(document); err != nil {
-				log.Error("failed to write analytics report", slog.String("error", err.Error()))
-			}
-		})
-
-		r.Route("/auth", func(r chi.Router) {
-			r.Post("/register", func(w http.ResponseWriter, req *http.Request) {
-				var payload struct {
-					Email    string `json:"email"`
-					Password string `json:"password"`
-				}
-
-				if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-					http.Error(w, "invalid request body", http.StatusBadRequest)
-					return
-				}
-
-				if strings.TrimSpace(payload.Email) == "" || strings.TrimSpace(payload.Password) == "" {
-					http.Error(w, "email and password are required", http.StatusBadRequest)
-					return
-				}
-
-				hash, err := auth.HashPassword(payload.Password)
-				if err != nil {
-					log.Error("failed to hash password", slog.String("error", err.Error()))
-					http.Error(w, "internal server error", http.StatusInternalServerError)
-					return
-				}
-
-				user := models.User{
-					Email:        payload.Email,
-					PasswordHash: hash,
-					Role:         models.UserRoleAdmin,
-					CreatedAt:    time.Now().UTC(),
-					UpdatedAt:    time.Now().UTC(),
-				}
-
-				id, err := store.CreateUser(req.Context(), &user)
-				if err != nil {
-					log.Error("failed to create user", slog.String("error", err.Error()))
-					http.Error(w, "failed to create user", http.StatusInternalServerError)
-					return
-				}
-
-				writeJSON(w, http.StatusCreated, map[string]string{"id": id.String()})
-			})
-
-			r.Post("/login", func(w http.ResponseWriter, req *http.Request) {
-				var payload struct {
-					Email    string `json:"email"`
-					Password string `json:"password"`
-				}
-
-				if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
-					http.Error(w, "invalid request body", http.StatusBadRequest)
-					return
-				}
-
-				user, err := store.GetUserByEmail(req.Context(), payload.Email)
-				if err != nil {
-					if errors.Is(err, storage.ErrNotFound) {
-						http.Error(w, "invalid credentials", http.StatusUnauthorized)
-						return
-					}
-
-					log.Error("failed to get user", slog.String("error", err.Error()))
-					http.Error(w, "internal server error", http.StatusInternalServerError)
-					return
-				}
-
-				if !auth.CheckPasswordHash(payload.Password, user.PasswordHash) {
 					http.Error(w, "invalid credentials", http.StatusUnauthorized)
 					return
 				}
 
-				// TODO: Секрет лучше брать из конфига, пока захардкодим для примера
-				token, err := auth.NewToken("super-secret-key", *user, 24*time.Hour)
-				if err != nil {
-					log.Error("failed to generate token", slog.String("error", err.Error()))
-					http.Error(w, "internal server error", http.StatusInternalServerError)
-					return
-				}
+				log.Error("failed to get user", slog.String("error", err.Error()))
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
 
-				writeJSON(w, http.StatusOK, map[string]string{"token": token})
-			})
+			if !auth.CheckPasswordHash(payload.Password, user.PasswordHash) {
+				http.Error(w, "invalid credentials", http.StatusUnauthorized)
+				return
+			}
+
+			token, err := auth.NewToken(secret, *user, 24*time.Hour)
+			if err != nil {
+				log.Error("failed to generate token", slog.String("error", err.Error()))
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]string{"token": token})
 		})
 
 		r.Route("/embed", func(r chi.Router) {
@@ -516,6 +217,371 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 				w.WriteHeader(http.StatusAccepted)
 			})
 		})
+
+		r.Post("/analytics/events", func(w http.ResponseWriter, req *http.Request) {
+			var CreateEventReq models.CreateEventReq
+			if err := json.NewDecoder(req.Body).Decode(&CreateEventReq); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			if CreateEventReq.SessionID == "" {
+				http.Error(w, "session_id is required", http.StatusBadRequest)
+				return
+			}
+			if CreateEventReq.ScenarioID == uuid.Nil {
+				http.Error(w, "scenario_id is required", http.StatusBadRequest)
+				return
+			}
+			if CreateEventReq.EventType == "" {
+				http.Error(w, "event_type is required", http.StatusBadRequest)
+				return
+			}
+
+			if !CreateEventReq.EventType.Valid() {
+				http.Error(w, "invalid event type", http.StatusBadRequest)
+				return
+			}
+
+			if err := store.CreateAnalyticsEvent(req.Context(), CreateEventReq); err != nil {
+				log.Error("failed to create analytics event", slog.String("error", err.Error()))
+				http.Error(w, "failed to create analytics event", http.StatusInternalServerError)
+				return
+			}
+
+			writeJSON(w, http.StatusCreated, map[string]string{"status": "ok"})
+		})
+
+		r.Put("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+			var updateReq models.UpsertProgressReq
+			if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+			progress, err := store.UpsertProgress(req.Context(), id, updateReq)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "scenario not found", http.StatusNotFound)
+					return
+				}
+				log.Error("failed to update scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to update scenario", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, progress)
+		})
+
+		r.Get("/scenarios/{id}/progress", func(w http.ResponseWriter, req *http.Request) {
+			id, err := uuid.Parse(chi.URLParam(req, "id"))
+			if err != nil {
+				http.Error(w, "invalid scenario id", http.StatusBadRequest)
+				return
+			}
+
+			sessionID := req.URL.Query().Get("session_id")
+			if sessionID == "" {
+				sessionID = chi.URLParam(req, "session_id")
+			}
+
+			progress, err := store.GetProgress(req.Context(), id, sessionID)
+			if err != nil {
+				if errors.Is(err, storage.ErrNotFound) {
+					http.Error(w, "progress not found", http.StatusNotFound)
+					return
+				}
+				log.Error("failed to get scenario", slog.String("error", err.Error()))
+				http.Error(w, "failed to get scenario", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, progress)
+		})
+
+		//Private for authorized users
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Auth(secret))
+
+			r.Get("/scenarios", func(w http.ResponseWriter, req *http.Request) {
+				scenarios, err := store.GetScenarios(req.Context())
+				if err != nil {
+					log.Error("failed to get scenarios", slog.String("error", err.Error()))
+					http.Error(w, "failed to get scenarios", http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, http.StatusOK, scenarios)
+			})
+
+			r.Get("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
+				id, err := uuid.Parse(chi.URLParam(req, "id"))
+				if err != nil {
+					http.Error(w, "invalid scenario id", http.StatusBadRequest)
+					return
+				}
+
+				scenario, err := store.GetScenarioByID(req.Context(), id)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "scenario not found", http.StatusNotFound)
+						return
+					}
+					log.Error("failed to get scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to get scenario", http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, http.StatusOK, scenario)
+			})
+
+			r.Post("/scenarios", func(w http.ResponseWriter, req *http.Request) {
+				var scenario models.Scenario
+				if err := json.NewDecoder(req.Body).Decode(&scenario); err != nil {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
+				}
+
+				if strings.TrimSpace(scenario.Title) == "" {
+					http.Error(w, "title is required", http.StatusBadRequest)
+					return
+				}
+				if scenario.Type == "" {
+					scenario.Type = models.ScenarioTooltip
+				}
+				if !scenario.Type.Valid() {
+					http.Error(w, "invalid scenario type", http.StatusBadRequest)
+					return
+				}
+
+				id, err := store.CreateScenario(req.Context(), &scenario)
+				if err != nil {
+					log.Error("failed to create scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to create scenario", http.StatusInternalServerError)
+					return
+				}
+
+				created, err := store.GetScenarioByID(req.Context(), id)
+				if err != nil {
+					log.Error("failed to get created scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to get created scenario", http.StatusInternalServerError)
+					return
+				}
+
+				writeJSON(w, http.StatusCreated, created)
+			})
+
+			r.Patch("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
+				id, err := uuid.Parse(chi.URLParam(req, "id"))
+				if err != nil {
+					http.Error(w, "invalid scenario id", http.StatusBadRequest)
+					return
+				}
+
+				var updateReq models.UpdateScenarioReq
+				if err := json.NewDecoder(req.Body).Decode(&updateReq); err != nil {
+					http.Error(w, "invalid request body", http.StatusBadRequest)
+					return
+				}
+				if updateReq.Type != nil && !updateReq.Type.Valid() {
+					http.Error(w, "invalid scenario type", http.StatusBadRequest)
+					return
+				}
+
+				if err := store.UpdateScenario(req.Context(), id, updateReq); err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "scenario not found", http.StatusNotFound)
+						return
+					}
+					log.Error("failed to update scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to update scenario", http.StatusInternalServerError)
+					return
+				}
+
+				scenario, err := store.GetScenarioByID(req.Context(), id)
+				if err != nil {
+					log.Error("failed to fetch updated scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to fetch updated scenario", http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, http.StatusOK, scenario)
+			})
+
+			r.Delete("/scenarios/{id}", func(w http.ResponseWriter, req *http.Request) {
+				id, err := uuid.Parse(chi.URLParam(req, "id"))
+				if err != nil {
+					http.Error(w, "invalid scenario id", http.StatusBadRequest)
+					return
+				}
+
+				if err := store.DeleteScenario(req.Context(), id); err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "scenario not found", http.StatusNotFound)
+						return
+					}
+					log.Error("failed to delete scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to delete scenario", http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(http.StatusNoContent)
+			})
+
+			r.Get("/scenarios/{id}/analytics", func(w http.ResponseWriter, req *http.Request) {
+				id, err := uuid.Parse(chi.URLParam(req, "id"))
+				if err != nil {
+					http.Error(w, "invalid scenario id", http.StatusBadRequest)
+					return
+				}
+				analytics, err := store.GetScenarioAnalytics(req.Context(), id)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "scenario not found", http.StatusNotFound)
+						log.Error("failed to get analytics scenario", slog.String("error", err.Error()))
+						return
+					}
+					log.Error("failed to get scenario analytics", slog.String("error", err.Error()))
+					http.Error(w, "failed to get scenario analytics", http.StatusInternalServerError)
+					return
+				}
+				writeJSON(w, http.StatusOK, analytics)
+			})
+
+			r.Get("/scenarios/{id}/analytics/report", func(w http.ResponseWriter, req *http.Request) {
+				id, err := uuid.Parse(chi.URLParam(req, "id"))
+				if err != nil {
+					http.Error(w, "invalid scenario id", http.StatusBadRequest)
+					return
+				}
+
+				scenario, err := store.GetScenarioByID(req.Context(), id)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						http.Error(w, "scenario not found", http.StatusNotFound)
+						return
+					}
+					log.Error("failed to get report scenario", slog.String("error", err.Error()))
+					http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
+					return
+				}
+
+				analytics, err := store.GetScenarioAnalytics(req.Context(), id)
+				if err != nil {
+					log.Error("failed to get report analytics", slog.String("error", err.Error()))
+					http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
+					return
+				}
+
+				document, err := report.AnalyticsPDF(scenario, analytics)
+				if err != nil {
+					log.Error("failed to render analytics report", slog.String("error", err.Error()))
+					http.Error(w, "failed to create analytics report", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/pdf")
+				w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="analytics-%s.pdf"`, id))
+				w.Header().Set("Content-Length", fmt.Sprintf("%d", len(document)))
+				w.WriteHeader(http.StatusOK)
+				if _, err := w.Write(document); err != nil {
+					log.Error("failed to write analytics report", slog.String("error", err.Error()))
+				}
+			})
+
+			//Private for superadmin only
+			r.Group(func(r chi.Router) {
+				r.Use(auth.RequireRole(models.UserRoleSuperAdmin))
+				r.Post("/auth/register", func(w http.ResponseWriter, req *http.Request) {
+					var payload struct {
+						Email    string `json:"email"`
+						Password string `json:"password"`
+					}
+
+					if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+						http.Error(w, "invalid request body", http.StatusBadRequest)
+						return
+					}
+
+					if strings.TrimSpace(payload.Email) == "" || strings.TrimSpace(payload.Password) == "" {
+						http.Error(w, "email and password are required", http.StatusBadRequest)
+						return
+					}
+
+					hash, err := auth.HashPassword(payload.Password)
+					if err != nil {
+						log.Error("failed to hash password", slog.String("error", err.Error()))
+						http.Error(w, "internal server error", http.StatusInternalServerError)
+						return
+					}
+
+					user := models.User{
+						Email:        payload.Email,
+						PasswordHash: hash,
+						Role:         models.UserRoleAdmin,
+						CreatedAt:    time.Now().UTC(),
+						UpdatedAt:    time.Now().UTC(),
+					}
+
+					id, err := store.CreateUser(req.Context(), &user)
+					if err != nil {
+						log.Error("failed to create user", slog.String("error", err.Error()))
+						http.Error(w, "failed to create user", http.StatusInternalServerError)
+						return
+					}
+
+					writeJSON(w, http.StatusCreated, map[string]string{"id": id.String()})
+				})
+
+				r.Get("/users", func(w http.ResponseWriter, req *http.Request) {
+					users, err := store.ListUsers(req.Context())
+					if err != nil {
+						log.Error("failed to list users", slog.String("error", err.Error()))
+						http.Error(w, "internal server error", http.StatusInternalServerError)
+						return
+					}
+					writeJSON(w, http.StatusOK, users)
+				})
+
+				r.Get("/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+					id, err := uuid.Parse(chi.URLParam(req, "id"))
+					if err != nil {
+						http.Error(w, "invalid user id", http.StatusBadRequest)
+						return
+					}
+					user, err := store.GetUserByID(req.Context(), id)
+					if err != nil {
+						if errors.Is(err, storage.ErrNotFound) {
+							http.Error(w, "user not found", http.StatusNotFound)
+							return
+						}
+						log.Error("failed to fetch user", slog.String("error", err.Error()))
+						http.Error(w, "internal server error", http.StatusInternalServerError)
+						return
+					}
+					writeJSON(w, http.StatusOK, user)
+				})
+
+				r.Delete("/users/{id}", func(w http.ResponseWriter, req *http.Request) {
+					id, err := uuid.Parse(chi.URLParam(req, "id"))
+					if err != nil {
+						http.Error(w, "invalid user id", http.StatusBadRequest)
+						return
+					}
+					err = store.DeleteUser(req.Context(), id)
+					if err != nil {
+						if errors.Is(err, storage.ErrNotFound) {
+							http.Error(w, "user not found", http.StatusNotFound)
+							return
+						}
+						log.Error("failed to delete user", slog.String("error", err.Error()))
+						http.Error(w, "internal server error", http.StatusInternalServerError)
+						return
+					}
+					writeJSON(w, http.StatusNoContent, nil)
+				})
+
+			})
+		})
+
 	})
 
 	return r
@@ -532,7 +598,7 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 			http.MethodDelete,
 			http.MethodOptions,
 		},
-		AllowedHeaders:   []string{"Accept", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	})(next)
@@ -578,4 +644,43 @@ func setupLogger(env string) *slog.Logger {
 
 func normalizeString(s string) string {
 	return strings.TrimSpace(s)
+}
+
+func ensureSuperAdmin(ctx context.Context, store storage.ScenarioStorage, email, password, env string) error {
+	if email == "" || password == "" {
+		if env == envProd {
+			return fmt.Errorf("email or password is required")
+		}
+		return nil
+	}
+
+	_, err := store.GetUserByEmail(ctx, email)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, storage.ErrNotFound) {
+		return fmt.Errorf("failed to get user by email: %w", err)
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+	id, err := uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("failed to generate uuid: %w", err)
+	}
+	now := time.Now().UTC()
+
+	_, err = store.CreateUser(ctx, &models.User{
+		ID:           id,
+		Email:        email,
+		PasswordHash: hash,
+		Role:         models.UserRoleSuperAdmin,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+	return nil
 }
