@@ -656,6 +656,78 @@ func TestStorage_Users(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "list users success",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				id1 := uuid.New()
+				id2 := uuid.New()
+
+				_, _ = store.CreateUser(ctx, &models.User{
+					ID:           id1,
+					Email:        "user1@example.com",
+					PasswordHash: "hash1",
+					Role:         "admin",
+					CreatedAt:    time.Now().UTC(),
+					UpdatedAt:    time.Now().UTC(),
+				})
+				_, _ = store.CreateUser(ctx, &models.User{
+					ID:           id2,
+					Email:        "user2@example.com",
+					PasswordHash: "hash2",
+					Role:         "superadmin",
+					CreatedAt:    time.Now().UTC(),
+					UpdatedAt:    time.Now().UTC(),
+				})
+				return uuid.Nil, ""
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, _ uuid.UUID, _ string) {
+				users, err := store.ListUsers(ctx)
+				if err != nil {
+					t.Fatalf("ListUsers failed: %v", err)
+				}
+				if len(users) != 2 {
+					t.Fatalf("expected 2 users, got %d", len(users))
+				}
+			},
+		},
+		{
+			name: "delete user success",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				id := uuid.New()
+				_, _ = store.CreateUser(ctx, &models.User{
+					ID:           id,
+					Email:        "todelete@example.com",
+					PasswordHash: "hash",
+					Role:         "admin",
+					CreatedAt:    time.Now().UTC(),
+					UpdatedAt:    time.Now().UTC(),
+				})
+				return id, ""
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, id uuid.UUID, _ string) {
+				err := store.DeleteUser(ctx, id)
+				if err != nil {
+					t.Fatalf("DeleteUser failed: %v", err)
+				}
+
+				_, err = store.GetUserByID(ctx, id)
+				if err != storage.ErrNotFound {
+					t.Fatalf("expected ErrNotFound after deletion, got %v", err)
+				}
+			},
+		},
+		{
+			name: "delete user not found",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				return uuid.New(), ""
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, id uuid.UUID, _ string) {
+				err := store.DeleteUser(ctx, id)
+				if err != storage.ErrNotFound {
+					t.Fatalf("expected ErrNotFound for missing user, got %v", err)
+				}
+			},
+		},
 	}
 
 	for _, tt := range cases {

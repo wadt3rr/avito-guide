@@ -56,7 +56,7 @@ func run() error {
 	}
 	defer storageDB.Close()
 
-	//Инициализация суперадмина
+	// Инициализация суперадмина
 	err = ensureSuperAdmin(ctx, storageDB, cfg.SuperAdmin.Email, cfg.SuperAdmin.Password, cfg.Env)
 	if err != nil {
 		return fmt.Errorf("failed to init superadmin: %w", err)
@@ -104,7 +104,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 	r.Use(middleware.Recoverer)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		//Public handlers
+		// Public handlers
 		r.Post("/auth/login", func(w http.ResponseWriter, req *http.Request) {
 			var payload struct {
 				Email    string `json:"email"`
@@ -300,7 +300,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 			writeJSON(w, http.StatusOK, progress)
 		})
 
-		//Private for authorized users
+		// Private for authorized users
 		r.Group(func(r chi.Router) {
 			r.Use(auth.Auth(secret))
 
@@ -487,7 +487,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 				}
 			})
 
-			//Private for superadmin only
+			// Private for superadmin only
 			r.Group(func(r chi.Router) {
 				r.Use(auth.RequireRole(models.UserRoleSuperAdmin))
 				r.Post("/auth/register", func(w http.ResponseWriter, req *http.Request) {

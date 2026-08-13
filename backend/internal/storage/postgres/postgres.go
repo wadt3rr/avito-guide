@@ -694,7 +694,7 @@ func (s *Storage) ListUsers(ctx context.Context) ([]models.User, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var u models.User
-		rows.Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+		_ = rows.Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 		users = append(users, u)
 	}
 	if err := rows.Err(); err != nil {
