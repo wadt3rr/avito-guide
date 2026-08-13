@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe('watchPathname', () => {
-  it('notifies for SPA pathname changes and ignores query-only changes', () => {
+  it('notifies for SPA pathname and query changes', () => {
     const onChange = vi.fn();
     const stop = watchPathname(onChange);
 
@@ -21,7 +21,7 @@ describe('watchPathname', () => {
     history.pushState(null, '', '/my?tab=active');
     history.replaceState(null, '', '/orders');
 
-    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenCalledTimes(3);
     stop();
   });
 

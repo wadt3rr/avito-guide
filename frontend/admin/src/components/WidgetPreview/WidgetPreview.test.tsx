@@ -24,6 +24,20 @@ const scenario: IScenario = {
 }
 
 describe('WidgetPreview', () => {
+  it('shows a concise message when the widget is unavailable', async () => {
+    render(<WidgetPreview scenario={scenario}/>)
+    const frame = screen.getByTitle('Предпросмотр виджета') as HTMLIFrameElement
+
+    window.dispatchEvent(new MessageEvent('message', {
+      data: {type: 'avito-widget-preview-error'},
+      origin: window.location.origin,
+      source: frame.contentWindow,
+    }))
+
+    expect(await screen.findByText('Виджет недоступен')).toBeTruthy()
+    expect(screen.queryByText(/8082/)).toBeNull()
+  })
+
   it('sends the current draft to the real widget after the frame is ready', async () => {
     render(<WidgetPreview scenario={scenario}/>)
     const frame = screen.getByTitle('Предпросмотр виджета') as HTMLIFrameElement

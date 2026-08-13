@@ -3,6 +3,7 @@ export type ScenarioType = 'tooltip' | 'modal' | 'banner';
 
 export interface Step {
   id: string;
+  kind?: string;
   step_order: number;
   title: string;
   content: string;

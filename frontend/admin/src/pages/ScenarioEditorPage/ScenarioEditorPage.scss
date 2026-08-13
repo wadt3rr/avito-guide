@@ -8,7 +8,6 @@
 
   &__main {
     min-height: 100svh;
-    margin-left: tokens.$sidebar-width;
 
     @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
       margin-left: 0;
@@ -208,16 +207,60 @@
 
     &__actions {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr);
       width: 100%;
 
-      .button:last-child {
-        grid-column: 1 / -1;
+      .button {
+        width: 100%;
+        min-height: 44px;
       }
+    }
+
+    &__title-row {
+      align-items: flex-start;
+      flex-direction: column;
+
+      h1 {
+        font-size: 23px;
+        line-height: 29px;
+      }
+    }
+
+    &__back {
+      min-height: 44px;
+      margin-bottom: 16px;
+    }
+
+    &__experience {
+      gap: 24px;
+      padding: 16px;
+      margin-bottom: 48px;
     }
 
     &__sections {
       gap: 56px;
+    }
+
+    &__delete-action {
+      padding-top: 48px;
+
+      .button {
+        width: 100%;
+        min-height: 44px;
+      }
+    }
+
+    &__state {
+      padding: 32px 16px;
+    }
+
+    &__state-actions {
+      align-items: stretch;
+      flex-direction: column;
+
+      .button {
+        width: 100%;
+      }
     }
   }
 }

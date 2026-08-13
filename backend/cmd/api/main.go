@@ -103,6 +103,10 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public handlers
 
@@ -121,7 +125,7 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 				return
 			}
 
-			user, err := store.GetUserByEmail(req.Context(), payload.Email)
+			user, err := store.GetUserByEmail(req.Context(), normalizeEmail(payload.Email))
 			if err != nil {
 				if errors.Is(err, storage.ErrNotFound) {
 					http.Error(w, "invalid credentials", http.StatusUnauthorized)
@@ -308,6 +312,24 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 		// Private for authorized users
 		r.Group(func(r chi.Router) {
 			r.Use(auth.Auth(secret))
+
+			r.Get("/auth/me", func(w http.ResponseWriter, req *http.Request) {
+				user, ok := auth.UserFromContext(req.Context())
+				if !ok {
+					http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+					return
+				}
+
+				writeJSON(w, http.StatusOK, struct {
+					ID    uuid.UUID       `json:"id"`
+					Email string          `json:"email"`
+					Role  models.UserRole `json:"role"`
+				}{
+					ID:    user.ID,
+					Email: user.Email,
+					Role:  user.Role,
+				})
+			})
 
 			r.Get("/scenarios", func(w http.ResponseWriter, req *http.Request) {
 				scenarios, err := store.GetScenarios(req.Context())
@@ -658,7 +680,12 @@ func normalizeString(s string) string {
 	return strings.TrimSpace(s)
 }
 
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 func ensureSuperAdmin(ctx context.Context, store storage.ScenarioStorage, email, password, env string) error {
+	email = normalizeEmail(email)
 	if email == "" || password == "" {
 		if env == envProd {
 			return fmt.Errorf("email or password is required")
@@ -666,8 +693,15 @@ func ensureSuperAdmin(ctx context.Context, store storage.ScenarioStorage, email,
 		return nil
 	}
 
-	_, err := store.GetUserByEmail(ctx, email)
+	user, err := store.GetUserByEmail(ctx, email)
 	if err == nil {
+		hash, hashErr := auth.HashPassword(password)
+		if hashErr != nil {
+			return fmt.Errorf("failed to hash password: %w", hashErr)
+		}
+		if err := store.UpdateUserAuth(ctx, user.ID, email, hash, models.UserRoleSuperAdmin); err != nil {
+			return fmt.Errorf("failed to synchronize superadmin: %w", err)
+		}
 		return nil
 	}
 	if !errors.Is(err, storage.ErrNotFound) {

@@ -1,5 +1,9 @@
 import type {IScenarioStep, ScenarioType} from '../../data/scenarios'
-import {MAX_STEP_CONTENT_LENGTH, MAX_STEP_TITLE_LENGTH} from '../../data/scenarioTypes'
+import {
+  getStepPlaceholders,
+  MAX_STEP_CONTENT_LENGTH,
+  MAX_STEP_TITLE_LENGTH,
+} from '../../data/scenarioTypes'
 import './StandaloneScenarioContent.scss'
 
 interface IStandaloneScenarioContent {
@@ -15,6 +19,7 @@ export function StandaloneScenarioContent({
 }: IStandaloneScenarioContent) {
   const isModal = type === 'modal'
   const widgetName = isModal ? 'модального окна' : 'баннера'
+  const placeholders = getStepPlaceholders(type)
 
   return (
     <section className="standalone-content" aria-labelledby="standalone-content-title">
@@ -36,7 +41,7 @@ export function StandaloneScenarioContent({
             autoComplete="off"
             maxLength={MAX_STEP_TITLE_LENGTH}
             onChange={(event) => onChange({...step, title: event.target.value})}
-            placeholder={isModal ? 'Заголовок окна' : 'Заголовок баннера'}
+            placeholder={placeholders.title}
             type="text"
             value={step.title}
           />
@@ -48,7 +53,7 @@ export function StandaloneScenarioContent({
             aria-label="Текст сообщения"
             maxLength={MAX_STEP_CONTENT_LENGTH}
             onChange={(event) => onChange({...step, text: event.target.value})}
-            placeholder="Введите текст"
+            placeholder={placeholders.content}
             rows={4}
             value={step.text}
           />

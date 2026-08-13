@@ -18,17 +18,18 @@ describe('mock scenario source', () => {
   it('resolves through the backend when data-api is configured', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, {status: 204}));
     vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
 
     const configuredSource = createSource({
       apiUrl: 'http://localhost:8081',
       debug: false,
     });
-    const scenario = await configuredSource.resolve({ path: '/my' });
+    const scenario = await configuredSource.resolve({ path: '/my' }, controller.signal);
 
     expect(scenario).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:8081/api/v1/embed/resolve',
-      expect.objectContaining({method: 'POST'}),
+      expect.objectContaining({method: 'POST', signal: controller.signal}),
     );
     vi.unstubAllGlobals();
   });

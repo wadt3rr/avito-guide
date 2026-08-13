@@ -27,6 +27,7 @@ type ScenarioStorage interface {
 	CreateUser(ctx context.Context, user *models.User) (uuid.UUID, error)
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, error)
+	UpdateUserAuth(ctx context.Context, id uuid.UUID, email, passwordHash string, role models.UserRole) error
 	ListUsers(ctx context.Context) ([]models.User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 }

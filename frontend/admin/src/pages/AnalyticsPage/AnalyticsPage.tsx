@@ -7,7 +7,6 @@ import {
     type IScenarioAnalytics,
 } from '../../api/scenarios'
 import {Button} from '../../components/Button/Button'
-import {Sidebar} from '../../components/Sidebar/Sidebar'
 import type {IScenario} from '../../data/scenarios'
 import './AnalyticsPage.scss'
 
@@ -156,7 +155,6 @@ export function AnalyticsPage() {
 
     return (
         <div className="analytics-page">
-            <Sidebar/>
 
             <main className="analytics-page__main">
                 <div className="analytics-page__content">

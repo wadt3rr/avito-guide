@@ -76,3 +76,9 @@
     cursor: not-allowed;
   }
 }
+
+@media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+  .button {
+    min-height: 44px;
+  }
+}

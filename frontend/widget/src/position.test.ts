@@ -27,4 +27,14 @@ describe('computePosition', () => {
     expect(result.left).toBeLessThanOrEqual(maxLeft);
     expect(result.top).toBeLessThanOrEqual(maxTop);
   });
+
+  it('keeps a mobile tooltip above or below its target', () => {
+    const target = new DOMRect(350, 220, 60, 40);
+    const tip = { width: 200, height: 300 };
+    const viewport = { width: 480, height: 480 };
+
+    const result = computePosition(target, tip, viewport);
+
+    expect(['bottom', 'top']).toContain(result.placement);
+  });
 });

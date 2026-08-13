@@ -28,4 +28,24 @@ describe('StepEditorDrawer limits', () => {
     expect(screen.getByLabelText('Название подсказки').getAttribute('maxlength')).toBe('100')
     expect(screen.getByLabelText('Текст').getAttribute('maxlength')).toBe('50')
   })
+
+  it('shows placeholders without writing them into an empty step', () => {
+    render(
+      <StepEditorDrawer
+        onClose={vi.fn()}
+        onDelete={vi.fn()}
+        onSave={vi.fn()}
+        scenarioPath="/create"
+        step={{id: 'empty', title: '', text: '', target: 'form-title', timeout: '5'}}
+        stepNumber={1}
+      />,
+    )
+
+    const title = screen.getByLabelText('Название подсказки') as HTMLInputElement
+    const content = screen.getByLabelText('Текст') as HTMLTextAreaElement
+    expect(title.value).toBe('')
+    expect(title.placeholder).toBe('Заголовок подсказки')
+    expect(content.value).toBe('')
+    expect(content.placeholder).toBe('Текст подсказки')
+  })
 })

@@ -1,0 +1,90 @@
+@use '../../styles/tokens' as tokens;
+
+.login-page {
+  display: grid;
+  min-height: 100svh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 15% 15%, rgb(0 144 222 / 10%), transparent 34%),
+    tokens.$color-canvas;
+  place-items: center;
+}
+
+.login-card {
+  width: min(100%, 420px);
+  padding: 36px;
+  background: tokens.$color-surface;
+  border: 1px solid tokens.$color-border;
+  border-radius: tokens.$radius-card;
+  box-shadow: tokens.$shadow-card;
+
+  &__brand {
+    margin-bottom: 28px;
+    color: tokens.$color-accent;
+    font: 700 18px/24px tokens.$font-heading;
+  }
+
+  h1 {
+    margin: 0;
+    color: tokens.$color-ink;
+    font: 700 30px/36px tokens.$font-heading;
+  }
+
+  &__subtitle {
+    margin: 10px 0 28px;
+    color: tokens.$color-ink-soft;
+    font: 400 14px/21px tokens.$font-ui;
+  }
+}
+
+.login-form {
+  display: grid;
+  gap: 18px;
+
+  label {
+    display: grid;
+    gap: 8px;
+    color: tokens.$color-ink-soft;
+    font: 600 13px/18px tokens.$font-ui;
+  }
+
+  input {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    color: tokens.$color-ink;
+    background: tokens.$color-surface;
+    border: 1px solid tokens.$color-border;
+    border-radius: tokens.$radius-control;
+    font: 400 14px/20px tokens.$font-ui;
+
+    &:focus {
+      border-color: tokens.$color-accent;
+      outline: 3px solid rgb(0 144 222 / 14%);
+    }
+  }
+
+  button {
+    min-height: 44px;
+    color: tokens.$color-surface;
+    background: tokens.$color-accent;
+    border: 0;
+    border-radius: tokens.$radius-control;
+    font: 600 14px/20px tokens.$font-ui;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { background: tokens.$color-accent-hover; }
+    &:disabled { cursor: wait; opacity: 0.65; }
+  }
+
+  &__error {
+    margin: -4px 0 0;
+    color: #c7352b;
+    font: 500 13px/19px tokens.$font-ui;
+  }
+}
+
+@media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+  .login-page { padding: 16px; }
+  .login-card { padding: 28px 22px; }
+}

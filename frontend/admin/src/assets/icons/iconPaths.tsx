@@ -10,11 +10,13 @@ export type IconName =
   | 'link'
   | 'list'
   | 'logout'
+  | 'menu'
   | 'modal'
   | 'scenarios'
   | 'search'
   | 'settings'
   | 'tooltip'
+  | 'users'
 
 export const iconPaths: Record<IconName, ReactNode> = {
   add: <path d="M12 5v14M5 12h14" />,
@@ -72,6 +74,13 @@ export const iconPaths: Record<IconName, ReactNode> = {
       <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />
     </>
   ),
+  menu: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </>
+  ),
   modal: (
     <>
       <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -102,6 +111,12 @@ export const iconPaths: Record<IconName, ReactNode> = {
       <path d="M4 5h7a3 3 0 0 1 3 3v8" />
       <path d="m10 13 4 4 4-4" />
       <circle cx="4" cy="5" r="1.5" />
+    </>
+  ),
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.5M17 14a5 5 0 0 1 4 5" />
     </>
   ),
 }

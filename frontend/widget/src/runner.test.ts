@@ -2,7 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Analytics } from './analytics';
+import { tooltipFlow } from './flow';
+import { createTooltipPresentation, type ScenarioPresentation } from './presentation';
 import { Runner } from './runner';
+import { ScenarioDefinitionRegistry } from './scenario-definition';
 import type { Scenario, ScenarioType } from './types';
 
 function standaloneScenario(type: Exclude<ScenarioType, 'tooltip'>): Scenario {
@@ -121,6 +124,55 @@ describe('Runner standalone experiences', () => {
 
     expect(analytics.track).not.toHaveBeenCalled();
     expect(localStorage.length).toBe(0);
+  });
+});
+
+describe('Runner extension contracts', () => {
+  it('uses an injected definition for presentation and traversal', async () => {
+    const customPresentation: ScenarioPresentation = {
+      type: 'modal',
+      configure(elements) {
+        elements.host.dataset.type = 'modal';
+        elements.catcher.className = 'catch catch--custom';
+        elements.catcher.style.pointerEvents = 'none';
+        elements.spot.hidden = true;
+        elements.tip.className = 'tip tip--custom';
+      },
+      position() {
+        // Custom standalone presentation is positioned by CSS.
+      },
+    };
+    const definitions = new ScenarioDefinitionRegistry([
+      {
+        type: 'tooltip',
+        flow: tooltipFlow,
+        presentation: createTooltipPresentation(),
+      },
+      {
+        type: 'modal',
+        flow: {...tooltipFlow, requiresTarget: () => false},
+        presentation: customPresentation,
+      },
+    ]);
+    const scenario = tooltipScenario();
+    scenario.type = 'modal';
+    const analytics = { track: vi.fn() } as unknown as Analytics;
+    const runner = new Runner(scenario, analytics, {definitions});
+
+    try {
+      await runner.start();
+      let root = document.getElementById('avito-onboarding-root')?.shadowRoot;
+      expect(root?.querySelector('.tip--custom')).not.toBeNull();
+      expect(root?.querySelector('.tip__title')?.textContent).toBe('First step');
+
+      (root?.querySelector('.btn--primary') as HTMLButtonElement).click();
+      await vi.waitFor(() => {
+        root = document.getElementById('avito-onboarding-root')?.shadowRoot;
+        expect(root?.querySelector('.tip__title')?.textContent).toBe('Second step');
+      });
+    } finally {
+      runner.stop();
+    }
   });
 });
 

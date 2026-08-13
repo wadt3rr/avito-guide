@@ -645,6 +645,38 @@ func TestStorage_Users(t *testing.T) {
 			},
 		},
 		{
+			name: "update user authentication fields",
+			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
+				id := uuid.New()
+				_, err := store.CreateUser(ctx, &models.User{
+					ID:           id,
+					Email:        "SUPER@EXAMPLE.COM",
+					PasswordHash: "old-hash",
+					Role:         models.UserRoleAdmin,
+					CreatedAt:    time.Now().UTC(),
+					UpdatedAt:    time.Now().UTC(),
+				})
+				if err != nil {
+					t.Fatalf("CreateUser failed: %v", err)
+				}
+
+				if err := store.UpdateUserAuth(ctx, id, "super@example.com", "new-hash", models.UserRoleSuperAdmin); err != nil {
+					t.Fatalf("UpdateUserAuth failed: %v", err)
+				}
+
+				return id, "super@example.com"
+			},
+			assert: func(t *testing.T, ctx context.Context, store *Storage, id uuid.UUID, email string) {
+				user, err := store.GetUserByID(ctx, id)
+				if err != nil {
+					t.Fatalf("GetUserByID failed: %v", err)
+				}
+				if user.Email != email || user.PasswordHash != "new-hash" || user.Role != models.UserRoleSuperAdmin {
+					t.Fatalf("unexpected synchronized user: %+v", user)
+				}
+			},
+		},
+		{
 			name: "get user by id not found",
 			prepare: func(t *testing.T, ctx context.Context, store *Storage) (uuid.UUID, string) {
 				return uuid.New(), "doesntmatter@example.com"

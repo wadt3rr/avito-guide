@@ -1,6 +1,7 @@
 import {
   MAX_SCENARIO_DESCRIPTION_LENGTH,
   MAX_SCENARIO_TITLE_LENGTH,
+  SCENARIO_TITLE_PLACEHOLDER,
 } from '../../data/scenarioTypes'
 import './ScenarioDetailsForm.scss'
 
@@ -32,7 +33,7 @@ export function ScenarioDetailsForm({
             className="scenario-field__control"
             maxLength={MAX_SCENARIO_TITLE_LENGTH}
             onChange={(event) => onChange('title', event.target.value)}
-            placeholder="Введите название"
+            placeholder={SCENARIO_TITLE_PLACEHOLDER}
             type="text"
             value={title}
           />

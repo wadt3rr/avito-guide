@@ -209,7 +209,7 @@ func (s *stubScenarioStorage) CreateUser(ctx context.Context, user *models.User)
 
 func (s *stubScenarioStorage) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	for _, u := range s.users {
-		if u.Email == email {
+		if strings.EqualFold(u.Email, email) {
 			return &u, nil
 		}
 	}
@@ -222,6 +222,24 @@ func (s *stubScenarioStorage) GetUserByID(ctx context.Context, id uuid.UUID) (*m
 		return nil, storage.ErrNotFound
 	}
 	return &u, nil
+}
+
+func (s *stubScenarioStorage) UpdateUserAuth(
+	ctx context.Context,
+	id uuid.UUID,
+	email, passwordHash string,
+	role models.UserRole,
+) error {
+	user, ok := s.users[id]
+	if !ok {
+		return storage.ErrNotFound
+	}
+	user.Email = email
+	user.PasswordHash = passwordHash
+	user.Role = role
+	user.UpdatedAt = time.Now().UTC()
+	s.users[id] = user
+	return nil
 }
 
 func (s *stubScenarioStorage) ListUsers(ctx context.Context) ([]models.User, error) {
@@ -244,6 +262,59 @@ func addAuthHeader(req *http.Request, role models.UserRole) {
 	user := models.User{ID: uuid.New(), Email: "test@example.com", Role: role}
 	token, _ := auth.NewToken("test-secret", user, time.Hour)
 	req.Header.Set("Authorization", "Bearer "+token)
+}
+
+func TestRouter_AuthMe(t *testing.T) {
+	store := newStubStorage()
+	router := newRouter(store, setupLogger(envLocal), "test-secret")
+	user := models.User{
+		ID:           uuid.New(),
+		Email:        "admin@example.com",
+		PasswordHash: "must-not-leak",
+		Role:         models.UserRoleAdmin,
+	}
+	token, err := auth.NewToken("test-secret", user, time.Hour)
+	if err != nil {
+		t.Fatalf("create token: %v", err)
+	}
+
+	t.Run("returns the authenticated user without password data", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		res := httptest.NewRecorder()
+
+		router.ServeHTTP(res, req)
+
+		if res.Code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, res.Code, res.Body.String())
+		}
+
+		var body struct {
+			ID    uuid.UUID       `json:"id"`
+			Email string          `json:"email"`
+			Role  models.UserRole `json:"role"`
+		}
+		if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if body.ID != user.ID || body.Email != user.Email || body.Role != user.Role {
+			t.Fatalf("unexpected current user: %+v", body)
+		}
+		if strings.Contains(res.Body.String(), "password") {
+			t.Fatalf("response exposes password data: %s", res.Body.String())
+		}
+	})
+
+	t.Run("rejects a request without a token", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+		res := httptest.NewRecorder()
+
+		router.ServeHTTP(res, req)
+
+		if res.Code != http.StatusUnauthorized {
+			t.Fatalf("expected status %d, got %d: %s", http.StatusUnauthorized, res.Code, res.Body.String())
+		}
+	})
 }
 
 func TestRouter_Scenarios(t *testing.T) {
@@ -314,6 +385,26 @@ func TestRouter_Scenarios(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCORS_AllowsAuthorizationHeader(t *testing.T) {
+	handler := withCORS(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), []string{"*"})
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/scenarios", nil)
+	req.Header.Set("Origin", "http://localhost:5174")
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	req.Header.Set("Access-Control-Request-Headers", "Authorization")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("expected allowed origin *, got %q", got)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Headers"); got != "Authorization" {
+		t.Fatalf("expected Authorization to be allowed, got %q", got)
 	}
 }
 
@@ -595,6 +686,22 @@ func TestRouter_Auth(t *testing.T) {
 			},
 		},
 		{
+			name:         "login normalizes email",
+			method:       http.MethodPost,
+			path:         "/api/v1/auth/login",
+			body:         fmt.Sprintf(`{"email":"  USER@EXAMPLE.COM  ","password":"%s"}`, validPassword),
+			wantCode:     http.StatusOK,
+			asSuperAdmin: false,
+			setupStore: func(store *stubScenarioStorage) {
+				store.users[existingUserID] = models.User{
+					ID:           existingUserID,
+					Email:        validEmail,
+					PasswordHash: hashedPassword,
+					Role:         models.UserRoleAdmin,
+				}
+			},
+		},
+		{
 			name:         "login incorrect password",
 			method:       http.MethodPost,
 			path:         "/api/v1/auth/login",
@@ -663,6 +770,38 @@ func TestEnsureSuperAdmin(t *testing.T) {
 	err = ensureSuperAdmin(ctx, store, "super@example.com", "secure123", envLocal)
 	if err != nil {
 		t.Fatalf("expected no error on duplicate admin creation, got: %v", err)
+	}
+}
+
+func TestEnsureSuperAdmin_SynchronizesExistingUser(t *testing.T) {
+	ctx := context.Background()
+	store := newStubStorage()
+	oldHash, err := auth.HashPassword("old-password")
+	if err != nil {
+		t.Fatalf("hash old password: %v", err)
+	}
+	userID := uuid.New()
+	store.users[userID] = models.User{
+		ID:           userID,
+		Email:        "super@example.com",
+		PasswordHash: oldHash,
+		Role:         models.UserRoleAdmin,
+	}
+
+	err = ensureSuperAdmin(ctx, store, "  SUPER@EXAMPLE.COM  ", "new-password", envLocal)
+	if err != nil {
+		t.Fatalf("synchronize existing superadmin: %v", err)
+	}
+
+	updated := store.users[userID]
+	if updated.Email != "super@example.com" {
+		t.Fatalf("expected normalized email, got %q", updated.Email)
+	}
+	if updated.Role != models.UserRoleSuperAdmin {
+		t.Fatalf("expected superadmin role, got %q", updated.Role)
+	}
+	if !auth.CheckPasswordHash("new-password", updated.PasswordHash) {
+		t.Fatal("expected password hash to be refreshed from config")
 	}
 }
 

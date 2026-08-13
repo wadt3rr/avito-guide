@@ -7,7 +7,7 @@
 
   &__main {
     min-height: 100svh;
-    margin-left: tokens.$sidebar-width;
+
 
     @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
       margin-left: 0;
@@ -60,6 +60,11 @@
     padding-inline: 20px;
     font-size: 15.5px;
     line-height: 20px;
+
+    @media (max-width: 479px) {
+      width: 100%;
+      min-height: 44px;
+    }
   }
 
   &__state,
@@ -79,6 +84,15 @@
 
     p {
       margin: 0;
+    }
+
+    @media (max-width: 479px) {
+      align-items: stretch;
+      flex-direction: column;
+
+      .button {
+        width: 100%;
+      }
     }
   }
 

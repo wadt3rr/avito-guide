@@ -1,21 +1,13 @@
-import { computePosition } from './position';
+import {
+  createTooltipPresentation,
+  type ScenarioPresentation,
+  type UiElements,
+} from './presentation';
+import { defaultStepContentRegistry, type StepContentRegistry } from './step-content';
 import { STYLES } from './styles';
-import type { ScenarioType, Step } from './types';
+import type { StepView, UiHandlers } from './view';
 
-export interface StepView {
-  type: ScenarioType;
-  step: Step;
-  index: number;
-  total: number;
-  canGoBack: boolean;
-}
-
-export interface UiHandlers {
-  onNext: () => void;
-  onBack: () => void;
-  onSkip: () => void;
-  onDismiss: () => void;
-}
+export type { StepView, UiHandlers } from './view';
 
 const HOST_ID = 'avito-onboarding-root';
 
@@ -29,7 +21,11 @@ export class Ui {
   private frame = 0;
   private renderVersion = 0;
 
-  constructor(private readonly handlers: UiHandlers) {
+  constructor(
+    private readonly handlers: UiHandlers,
+    private readonly presentation: ScenarioPresentation = createTooltipPresentation(),
+    private readonly content: StepContentRegistry = defaultStepContentRegistry,
+  ) {
     this.host = document.createElement('div');
     this.host.id = HOST_ID;
     this.host.style.cssText = 'position:fixed;inset:0;z-index:2147483000;pointer-events:none';
@@ -56,22 +52,20 @@ export class Ui {
     this.onReflow = this.onReflow.bind(this);
     window.addEventListener('scroll', this.onReflow, true);
     window.addEventListener('resize', this.onReflow);
+    window.visualViewport?.addEventListener('resize', this.onReflow);
+    window.visualViewport?.addEventListener('scroll', this.onReflow);
   }
 
   render(view: StepView, target?: HTMLElement): void {
     const renderVersion = ++this.renderVersion;
-    this.target = view.type === 'tooltip' ? (target ?? null) : null;
-    this.host.dataset.type = view.type;
-    this.catcher.className = `catch catch--${view.type}`;
-    this.catcher.style.pointerEvents = view.type === 'banner' ? 'none' : 'auto';
-    this.spot.hidden = view.type !== 'tooltip';
-    this.tip.className = `tip tip--${view.type}`;
+    this.target = target ?? null;
     this.tip.style.removeProperty('visibility');
     this.tip.style.removeProperty('top');
     this.tip.style.removeProperty('left');
     this.tip.removeAttribute('data-placement');
     this.tip.dataset.ready = '0';
-    this.tip.replaceChildren(this.buildTip(view));
+    this.presentation.configure(this.elements());
+    this.tip.replaceChildren(this.content.resolve(view.step).render(view, this.handlers));
     this.reposition();
 
     const reveal = () => {
@@ -96,6 +90,8 @@ export class Ui {
     cancelAnimationFrame(this.frame);
     window.removeEventListener('scroll', this.onReflow, true);
     window.removeEventListener('resize', this.onReflow);
+    window.visualViewport?.removeEventListener('resize', this.onReflow);
+    window.visualViewport?.removeEventListener('scroll', this.onReflow);
     this.host.remove();
   }
 
@@ -108,81 +104,16 @@ export class Ui {
   }
 
   private reposition(): void {
-    if (!this.target) return;
-
-    const rect = this.target.getBoundingClientRect();
-    const pad = 6;
-
-    this.spot.style.top = `${rect.top - pad}px`;
-    this.spot.style.left = `${rect.left - pad}px`;
-    this.spot.style.width = `${rect.width + pad * 2}px`;
-    this.spot.style.height = `${rect.height + pad * 2}px`;
-
-    const tipRect = this.tip.getBoundingClientRect();
-    const position = computePosition(
-      rect,
-      { width: tipRect.width || 320, height: tipRect.height || 140 },
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-
-    this.tip.style.top = `${position.top}px`;
-    this.tip.style.left = `${position.left}px`;
-    this.tip.dataset.placement = position.placement;
+    this.presentation.position(this.elements(), this.target);
   }
 
-  private buildTip(view: StepView): DocumentFragment {
-    const fragment = document.createDocumentFragment();
-
-    const head = el('div', 'tip__head');
-    head.append(el('div', 'tip__title', view.step.title));
-    const close = el('button', 'tip__close', '×') as HTMLButtonElement;
-    close.type = 'button';
-    close.setAttribute('aria-label', 'Закрыть');
-    close.addEventListener('click', this.handlers.onDismiss);
-    head.append(close);
-
-    const foot = el('div', 'tip__foot');
-    const actions = el('div', 'tip__actions');
-    const isTour = view.type === 'tooltip' && view.total > 1;
-
-    if (isTour) {
-      foot.append(el('div', 'tip__count', `${view.index + 1} из ${view.total}`));
-      if (view.canGoBack) {
-        actions.append(button('Назад', 'btn--ghost', this.handlers.onBack));
-      }
-      actions.append(button('Пропустить', 'btn--ghost', this.handlers.onSkip));
-    }
-
-    actions.append(
-      button(
-        isTour && view.index < view.total - 1
-          ? 'Далее'
-          : view.type === 'tooltip'
-            ? 'Готово'
-            : 'Понятно',
-        'btn--primary',
-        this.handlers.onNext,
-      ),
-    );
-    foot.append(actions);
-
-    fragment.append(head, el('div', 'tip__body', view.step.content), foot);
-    return fragment;
+  private elements(): UiElements {
+    return {
+      host: this.host,
+      catcher: this.catcher,
+      spot: this.spot,
+      tip: this.tip,
+    };
   }
-}
 
-function el(tag: string, className: string, text?: string): HTMLElement {
-  const node = document.createElement(tag);
-  node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function button(label: string, modifier: string, onClick: () => void): HTMLButtonElement {
-  const node = document.createElement('button');
-  node.type = 'button';
-  node.className = `btn ${modifier}`;
-  node.textContent = label;
-  node.addEventListener('click', onClick);
-  return node;
 }

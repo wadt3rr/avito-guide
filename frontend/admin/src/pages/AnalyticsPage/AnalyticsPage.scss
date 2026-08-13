@@ -8,7 +8,6 @@
 
   &__main {
     min-height: 100svh;
-    margin-left: tokens.$sidebar-width;
 
     @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
       margin-left: 0;
@@ -354,6 +353,8 @@
 
     &__metrics {
       grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
+      margin-bottom: 32px;
     }
 
     &__step-heading {
@@ -365,6 +366,50 @@
     &__step-stats {
       width: 100%;
       justify-content: space-between;
+    }
+
+    &__step-title {
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+    }
+
+    &__edit-link,
+    &__report-actions .button {
+      min-height: 44px;
+    }
+  }
+
+  @media (max-width: 479px) {
+    &__content {
+      padding: 20px 16px 40px;
+    }
+
+    &__header {
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    &__metric-card {
+      padding: 18px;
+    }
+
+    &__steps-card {
+      padding: 6px 16px;
+    }
+
+    &__step {
+      align-items: flex-start;
+      gap: 10px;
+      padding: 16px 0;
+    }
+
+    &__step-index {
+      width: 20px;
+    }
+
+    &__state {
+      padding: 44px 16px;
     }
   }
 }

@@ -15,7 +15,8 @@ export interface Position {
 const GAP = 12;
 const EDGE = 12;
 
-const ORDER: Placement[] = ['bottom', 'top', 'right', 'left'];
+const DESKTOP_ORDER: Placement[] = ['bottom', 'top', 'right', 'left'];
+const MOBILE_ORDER: Placement[] = ['bottom', 'top'];
 
 function spaceFor(placement: Placement, target: DOMRect, viewport: Size): number {
   switch (placement) {
@@ -39,9 +40,10 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function computePosition(target: DOMRect, tip: Size, viewport: Size): Position {
+  const order = viewport.width <= 480 ? MOBILE_ORDER : DESKTOP_ORDER;
   const placement =
-    ORDER.find((candidate) => spaceFor(candidate, target, viewport) >= needFor(candidate, tip)) ??
-    ORDER.reduce((best, candidate) =>
+    order.find((candidate) => spaceFor(candidate, target, viewport) >= needFor(candidate, tip)) ??
+    order.reduce((best, candidate) =>
       spaceFor(candidate, target, viewport) > spaceFor(best, target, viewport) ? candidate : best,
     );
 

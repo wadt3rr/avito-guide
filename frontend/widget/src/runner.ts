@@ -1,14 +1,18 @@
 import type {Analytics} from './analytics';
+import {createDefaultScenarioRegistry, defaultStepContentRegistry} from './composition';
 import {resolveTarget, scrollIntoView} from './element';
 import {getProgress, saveProgress} from './progress';
-import {normalizeScenarioType} from './scenario-type';
-import type {Scenario, ScenarioType, Step} from './types';
+import type {ScenarioDefinition, ScenarioDefinitionRegistry} from './scenario-definition';
+import type {StepContentRegistry} from './step-content';
+import type {Scenario, Step} from './types';
 import {Ui} from './ui';
 
 type State = 'idle' | 'resolving' | 'showing' | 'finished' | 'aborted';
 
 export interface RunnerOptions {
   mode?: 'live' | 'preview';
+  definitions?: ScenarioDefinitionRegistry;
+  content?: StepContentRegistry;
 }
 
 export class Runner {
@@ -16,7 +20,8 @@ export class Runner {
   private index = 0;
   private ui: Ui | null = null;
   private pending: AbortController | null = null;
-  private readonly type: ScenarioType;
+  private readonly definition: ScenarioDefinition;
+  private readonly content: StepContentRegistry;
   private readonly isPreview: boolean;
 
   constructor(
@@ -25,7 +30,10 @@ export class Runner {
     options: RunnerOptions = {},
     private readonly onEnd: () => void = () => {},
   ) {
-    this.type = normalizeScenarioType(scenario.type);
+    this.definition = (options.definitions ?? createDefaultScenarioRegistry()).resolve(
+      scenario.type,
+    );
+    this.content = options.content ?? defaultStepContentRegistry;
     this.isPreview = options.mode === 'preview';
     this.onKeyDown = this.onKeyDown.bind(this);
   }
@@ -35,16 +43,14 @@ export class Runner {
     const saved = this.isPreview ? null : getProgress(this.scenario.id);
     if (saved?.finished) return;
 
-    this.index = this.type === 'tooltip'
-      ? Math.min(saved?.step ?? 0, this.scenario.steps.length - 1)
-      : 0;
+    this.index = this.definition.flow.initialIndex(saved?.step, this.scenario.steps.length);
 
     this.ui = new Ui({
       onNext: () => void this.advance('step_completed'),
       onBack: () => void this.back(),
       onSkip: () => void this.advance('step_skipped'),
       onDismiss: () => this.dismiss(),
-    });
+    }, this.definition.presentation, this.content);
     document.addEventListener('keydown', this.onKeyDown);
     this.track('scenario_started', null, {resumed_at_step: this.index});
     await this.enter(this.index);
@@ -55,23 +61,26 @@ export class Runner {
     const step = this.scenario.steps[index];
     if (!step) return this.finish();
 
-    if (this.type !== 'tooltip') {
-      this.showStandalone(step);
+    if (this.state === 'showing') this.ui?.prepareForTransition();
+    this.pending?.abort();
+    this.pending = null;
+    this.index = index;
+
+    if (!this.definition.flow.requiresTarget(step)) {
+      this.show(step);
       return;
     }
 
-    if (this.state === 'showing') this.ui?.prepareForTransition();
-    this.pending?.abort();
-    this.pending = new AbortController();
+    const controller = new AbortController();
+    this.pending = controller;
     this.state = 'resolving';
-    this.index = index;
 
     const target = await resolveTarget(
       step.selector ?? '',
       step.timeout_sec * 1000,
-      this.pending.signal,
+      controller.signal,
     );
-    if (this.pending.signal.aborted) return;
+    if (controller.signal.aborted) return;
 
     if (!target) {
       this.track('step_failed', step.id, {
@@ -82,48 +91,45 @@ export class Runner {
     }
 
     await scrollIntoView(target);
-    if (this.pending.signal.aborted) return;
+    if (controller.signal.aborted) return;
+    this.show(step, target);
+  }
+
+  private show(step: Step, target?: HTMLElement): void {
     this.state = 'showing';
-    this.saveProgress(index);
+    this.saveProgress(this.index);
     this.track('step_shown', step.id);
     this.ui?.render({
-      type: this.type,
       step,
-      index,
-      total: this.scenario.steps.length,
-      canGoBack: index > 0,
+      index: this.index,
+      total: this.definition.flow.viewTotal(this.scenario.steps.length),
+      navigation: this.definition.flow.navigation(this.index, this.scenario.steps.length),
     }, target);
   }
 
-  private showStandalone(step: Step): void {
-    this.state = 'showing';
-    this.index = 0;
-    this.saveProgress(0);
-    this.track('step_shown', step.id);
-    this.ui?.render({type: this.type, step, index: 0, total: 1, canGoBack: false});
-  }
-
   private async skipUnresolvable(index: number): Promise<void> {
-    if (index + 1 >= this.scenario.steps.length) {
+    const nextIndex = this.definition.flow.nextIndex(index, this.scenario.steps.length);
+    if (nextIndex === null) {
       this.track('scenario_dismissed', null, {reason: 'no_resolvable_steps'});
       return this.teardown('aborted');
     }
-    await this.enter(index + 1);
+    await this.enter(nextIndex);
   }
 
   private async advance(reason: 'step_completed' | 'step_skipped'): Promise<void> {
     if (this.state !== 'showing') return;
     const step = this.scenario.steps[this.index];
     if (step) this.track(reason, step.id);
-    if (this.type !== 'tooltip' || this.index + 1 >= this.scenario.steps.length) {
-      return this.finish();
-    }
-    await this.enter(this.index + 1);
+    const nextIndex = this.definition.flow.nextIndex(this.index, this.scenario.steps.length);
+    if (nextIndex === null) return this.finish();
+    await this.enter(nextIndex);
   }
 
   private async back(): Promise<void> {
-    if (this.state !== 'showing' || this.index === 0) return;
-    await this.enter(this.index - 1);
+    if (this.state !== 'showing') return;
+    const previousIndex = this.definition.flow.previousIndex(this.index);
+    if (previousIndex === null) return;
+    await this.enter(previousIndex);
   }
 
   private finish(): void {
