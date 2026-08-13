@@ -109,6 +109,11 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public handlers
+
+		r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+		})
+
 		r.Post("/auth/login", func(w http.ResponseWriter, req *http.Request) {
 			var payload struct {
 				Email    string `json:"email"`
@@ -356,6 +361,13 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger, secret string) h
 					http.Error(w, "invalid scenario type", http.StatusBadRequest)
 					return
 				}
+
+				user, ok := auth.UserFromContext(req.Context())
+				if !ok {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+				scenario.UserID = user.ID
 
 				id, err := store.CreateScenario(req.Context(), &scenario)
 				if err != nil {

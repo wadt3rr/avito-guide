@@ -2,23 +2,36 @@
 set -eu
 
 API="${API_URL:-http://backend:8081}/api/v1"
+EMAIL="${SUPERADMIN_EMAIL:-admin@avito.local}"
+PASSWORD="${SUPERADMIN_PASSWORD:-admin12345}"
 
-until curl -sf "$API/scenarios" >/dev/null 2>&1; do
+until curl -sf "$API/health" >/dev/null 2>&1; do
   sleep 2
 done
 
-if [ "$(curl -sf "$API/scenarios")" != "[]" ]; then
+TOKEN=$(curl -sf -X POST "$API/auth/login" -H 'Content-Type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
+  | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+
+if [ -z "$TOKEN" ]; then
+  echo "seed: не удалось залогиниться под $EMAIL, пропускаю"
+  exit 0
+fi
+
+AUTH="Authorization: Bearer $TOKEN"
+
+if [ "$(curl -sf -H "$AUTH" "$API/scenarios")" != "[]" ]; then
   echo "seed: сценарии уже есть, пропускаю"
   exit 0
 fi
 
 create() {
-  curl -sf -X POST "$API/scenarios" -H 'Content-Type: application/json' -d "$1" \
+  curl -sf -X POST "$API/scenarios" -H "$AUTH" -H 'Content-Type: application/json' -d "$1" \
     | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4
 }
 
 publish() {
-  curl -sf -o /dev/null -X PATCH "$API/scenarios/$1" -H 'Content-Type: application/json' -d "$2"
+  curl -sf -o /dev/null -X PATCH "$API/scenarios/$1" -H "$AUTH" -H 'Content-Type: application/json' -d "$2"
 }
 
 ID=$(create '{
