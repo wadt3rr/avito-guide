@@ -536,7 +536,7 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 			http.MethodDelete,
 			http.MethodOptions,
 		},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	})(next)
