@@ -17,13 +17,13 @@ import {Icon} from '../../components/Icon/Icon'
 import {ScenarioDetailsForm} from '../../components/ScenarioDetailsForm/ScenarioDetailsForm'
 import {ScenarioSteps} from '../../components/ScenarioSteps/ScenarioSteps'
 import {ScenarioTypeSelector} from '../../components/ScenarioTypeSelector/ScenarioTypeSelector'
-import {Sidebar} from '../../components/Sidebar/Sidebar'
 import {StandaloneScenarioContent} from '../../components/StandaloneScenarioContent/StandaloneScenarioContent'
 import {StepEditorDrawer} from '../../components/StepEditorDrawer/StepEditorDrawer'
 import {WidgetPreview} from '../../components/WidgetPreview/WidgetPreview'
 import {
     changeScenarioType,
     normalizeScenarioForSave,
+    SCENARIO_TITLE_PLACEHOLDER,
     validateScenario,
 } from '../../data/scenarioTypes'
 import {
@@ -341,7 +341,6 @@ export function ScenarioEditorPage() {
     if (isLoading) {
         return (
             <div className="scenario-editor-page">
-                <Sidebar/>
                 <main className="scenario-editor-page__main">
                     <p className="scenario-editor-page__state" role="status">
                         Загружаем сценарий…
@@ -354,7 +353,6 @@ export function ScenarioEditorPage() {
     if (loadError) {
         return (
             <div className="scenario-editor-page">
-                <Sidebar/>
                 <main className="scenario-editor-page__main">
                     <div className="scenario-editor-page__state" role="alert">
                         <p>{loadError}</p>
@@ -376,7 +374,6 @@ export function ScenarioEditorPage() {
 
     return (
         <div className="scenario-editor-page">
-            <Sidebar/>
 
             <main className="scenario-editor-page__main">
                 <div className="scenario-editor-page__content">
@@ -395,7 +392,7 @@ export function ScenarioEditorPage() {
                                 Редактор сценария
                             </p>
                             <div className="scenario-editor-page__title-row">
-                                <h1>{scenario.title || 'Новый сценарий'}</h1>
+                                <h1>{scenario.title || SCENARIO_TITLE_PLACEHOLDER}</h1>
                                 <span
                                     className={`scenario-editor-page__status${scenario.status === 'published' ? ' scenario-editor-page__status--published' : ''}`}
                                 >

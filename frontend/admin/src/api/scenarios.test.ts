@@ -1,4 +1,5 @@
-import {afterEach, describe, expect, it, vi} from 'vitest'
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+import {saveSession} from '../auth/session'
 import {
   deleteScenario,
   getScenarioAnalyticsReport,
@@ -6,6 +7,15 @@ import {
   getScenarios,
   ScenarioApiError,
 } from './scenarios'
+
+beforeEach(() => {
+  const values = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  })
+})
 
 afterEach(() => {
   vi.useRealTimers()
@@ -23,6 +33,25 @@ describe('scenario API boundary', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `http://localhost:8081/api/v1/scenarios/${scenarioId}`,
       expect.objectContaining({method: 'DELETE'}),
+    )
+  })
+
+  it('sends the stored bearer token to protected scenario routes', async () => {
+    const scenarioId = '123e4567-e89b-42d3-a456-426614174000'
+    saveSession({
+      token: 'jwt-token',
+      user: {id: 'user-id', email: 'admin@example.com', role: 'admin'},
+    })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, {status: 204}))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await deleteScenario(scenarioId)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8081/api/v1/scenarios/${scenarioId}`,
+      expect.objectContaining({
+        headers: expect.objectContaining({Authorization: 'Bearer jwt-token'}),
+      }),
     )
   })
 

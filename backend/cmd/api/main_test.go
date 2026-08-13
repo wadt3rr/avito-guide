@@ -294,6 +294,26 @@ func TestRouter_Scenarios(t *testing.T) {
 	}
 }
 
+func TestCORS_AllowsAuthorizationHeader(t *testing.T) {
+	handler := withCORS(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}), []string{"*"})
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/scenarios", nil)
+	req.Header.Set("Origin", "http://localhost:5174")
+	req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+	req.Header.Set("Access-Control-Request-Headers", "Authorization")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("expected allowed origin *, got %q", got)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Headers"); got != "Authorization" {
+		t.Fatalf("expected Authorization to be allowed, got %q", got)
+	}
+}
+
 func TestRouter_UpdateScenario(t *testing.T) {
 	tests := []struct {
 		name      string

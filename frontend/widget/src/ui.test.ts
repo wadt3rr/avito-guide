@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { standaloneFlow, tooltipFlow } from './flow';
+import { createStandalonePresentation } from './presentation';
+import { StepContentRegistry, type StepContentRenderer } from './step-content';
 import { STYLES } from './styles';
 import type { ScenarioType, Step } from './types';
 import { Ui, type StepView, type UiHandlers } from './ui';
@@ -23,12 +26,12 @@ const handlers: UiHandlers = {
 };
 
 function view(type: ScenarioType, total = 1): StepView {
+  const flow = type === 'tooltip' ? tooltipFlow : standaloneFlow;
   return {
-    type,
     step,
     index: 0,
-    total,
-    canGoBack: false,
+    total: flow.viewTotal(total),
+    navigation: flow.navigation(0, total),
   };
 }
 
@@ -41,9 +44,52 @@ function shadowRoot(): ShadowRoot {
 afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('Ui variants', () => {
+  it('renders content through the injected renderer registry', () => {
+    const renderer: StepContentRenderer = {
+      kind: 'custom',
+      render() {
+        const fragment = document.createDocumentFragment();
+        const content = document.createElement('div');
+        content.className = 'custom-content';
+        fragment.append(content);
+        return fragment;
+      },
+    };
+    const registry = new StepContentRegistry([renderer], 'custom');
+    const ui = new Ui(
+      handlers,
+      createStandalonePresentation('modal', true),
+      registry,
+    );
+    try {
+      ui.render(view('modal'));
+
+      expect(shadowRoot().querySelector('.custom-content')).not.toBeNull();
+    } finally {
+      ui.destroy();
+    }
+  });
+
+  it('uses the injected presentation instead of branching on the view type', () => {
+    vi.useFakeTimers();
+    const ui = new Ui(handlers, createStandalonePresentation('banner', false));
+    try {
+      ui.render(view('tooltip'));
+
+      const root = shadowRoot();
+      expect(root.querySelector('.tip--banner')).not.toBeNull();
+      expect((root.querySelector('.catch') as HTMLElement).style.pointerEvents).toBe('none');
+    } finally {
+      ui.destroy();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it('renders multi-step tooltip navigation next to its target', () => {
     const target = document.createElement('button');
     document.body.append(target);
@@ -75,7 +121,7 @@ describe('Ui variants', () => {
   });
 
   it('renders a standalone blocking modal without tour chrome', () => {
-    const ui = new Ui(handlers);
+    const ui = new Ui(handlers, createStandalonePresentation('modal', true));
 
     ui.render(view('modal'));
 
@@ -88,7 +134,7 @@ describe('Ui variants', () => {
   });
 
   it('renders a standalone non-blocking banner without tour chrome', () => {
-    const ui = new Ui(handlers);
+    const ui = new Ui(handlers, createStandalonePresentation('banner', false));
 
     ui.render(view('banner'));
 
@@ -102,6 +148,26 @@ describe('Ui variants', () => {
 });
 
 describe('Ui positioning while the page moves', () => {
+  it('reflows when the mobile visual viewport changes', () => {
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    vi.stubGlobal('visualViewport', {
+      width: 320,
+      height: 568,
+      addEventListener,
+      removeEventListener,
+    });
+    const ui = new Ui(handlers);
+
+    expect(addEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(addEventListener).toHaveBeenCalledWith('scroll', expect.any(Function));
+
+    ui.destroy();
+
+    expect(removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith('scroll', expect.any(Function));
+  });
+
   it('coalesces repeated scroll events without postponing the scheduled frame', () => {
     const frames: FrameRequestCallback[] = [];
     const requestFrame = vi
@@ -150,5 +216,13 @@ describe('Ui tour footer', () => {
     expect(STYLES).toMatch(/\.tip__count\s*\{[^}]*white-space:\s*nowrap/s);
     expect(STYLES).toMatch(/\.tip--tooltip \.tip__actions\s*\{[^}]*gap:\s*4px/s);
     expect(STYLES).toMatch(/\.tip--tooltip \.btn\s*\{[^}]*padding[^:]*:\s*8px 10px/s);
+  });
+
+  it('contains mobile-only size, scrolling, safe-area, and touch rules', () => {
+    expect(STYLES).toMatch(/@media \(max-width: 480px\)/);
+    expect(STYLES).toMatch(/max-height:\s*calc\(100dvh/);
+    expect(STYLES).toMatch(/env\(safe-area-inset-bottom\)/);
+    expect(STYLES).toMatch(/min-height:\s*44px/);
+    expect(STYLES).toMatch(/overflow-y:\s*auto/);
   });
 });

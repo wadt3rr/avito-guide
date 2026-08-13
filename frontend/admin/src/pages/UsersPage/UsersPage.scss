@@ -1,0 +1,110 @@
+@use '../../styles/tokens' as tokens;
+
+.users-page {
+  width: min(100%, tokens.$content-max-width);
+  min-height: 100svh;
+  padding: 44px 48px;
+
+  &__header {
+    margin-bottom: 28px;
+
+    h1 {
+      margin: 2px 0 8px;
+      color: tokens.$color-ink;
+      font: 700 30px/36px tokens.$font-heading;
+    }
+
+    p:not(.users-page__eyebrow) {
+      margin: 0;
+      color: tokens.$color-ink-soft;
+      font: 400 14px/21px tokens.$font-ui;
+    }
+  }
+
+  &__eyebrow {
+    margin: 0;
+    color: tokens.$color-accent;
+    font: 700 12px/18px tokens.$font-ui;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+
+.users-card {
+  width: min(100%, 560px);
+  padding: 28px;
+  background: tokens.$color-surface;
+  border: 1px solid tokens.$color-border;
+  border-radius: tokens.$radius-card;
+  box-shadow: tokens.$shadow-card;
+
+  h2 {
+    margin: 0 0 6px;
+    font: 700 20px/26px tokens.$font-heading;
+  }
+
+  > p {
+    margin: 0 0 24px;
+    color: tokens.$color-ink-soft;
+    font: 400 13px/20px tokens.$font-ui;
+  }
+}
+
+.users-form {
+  display: grid;
+  gap: 18px;
+
+  label {
+    display: grid;
+    gap: 7px;
+    color: tokens.$color-ink-soft;
+    font: 600 13px/18px tokens.$font-ui;
+  }
+
+  input {
+    min-height: 44px;
+    padding: 10px 12px;
+    color: tokens.$color-ink;
+    background: tokens.$color-surface;
+    border: 1px solid tokens.$color-border;
+    border-radius: tokens.$radius-control;
+    font: 400 14px/20px tokens.$font-ui;
+
+    &:focus {
+      border-color: tokens.$color-accent;
+      outline: 3px solid rgb(0 144 222 / 14%);
+    }
+  }
+
+  small { color: tokens.$color-ink-faint; font-weight: 400; }
+
+  button {
+    justify-self: start;
+    min-height: 42px;
+    padding: 10px 16px;
+    color: tokens.$color-surface;
+    background: tokens.$color-accent;
+    border: 0;
+    border-radius: tokens.$radius-control;
+    font: 600 14px/20px tokens.$font-ui;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { background: tokens.$color-accent-hover; }
+    &:disabled { cursor: wait; opacity: 0.65; }
+  }
+
+  &__error,
+  &__success { margin: -4px 0 0; font: 500 13px/19px tokens.$font-ui; }
+  &__error { color: #c7352b; }
+  &__success { color: tokens.$color-success; }
+}
+
+@media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+  .users-page { padding: 28px 24px; }
+}
+
+@media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+  .users-page { padding: 24px 16px; }
+  .users-card { padding: 22px 18px; }
+  .users-form button { width: 100%; }
+}

@@ -104,7 +104,7 @@ export function WidgetPreview({scenario}: IWidgetPreview) {
         )}
         {status === 'error' && (
           <span className="widget-preview__state widget-preview__state--error" role="status">
-            Предпросмотр недоступен. Запустите сборку widget на порту 8082.
+            Виджет недоступен
           </span>
         )}
       </div>

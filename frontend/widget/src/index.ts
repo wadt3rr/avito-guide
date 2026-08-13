@@ -1,4 +1,5 @@
 import {Analytics} from './analytics';
+import {createDefaultScenarioRegistry} from './composition';
 import {watchPathname} from './navigation';
 import {getAnonId, getSessionId} from './progress';
 import {Runner} from './runner';
@@ -31,50 +32,114 @@ const config = readConfig();
 const facts: Record<string, string> = {};
 const analytics = new Analytics(config, {sessionId: getSessionId()});
 const source = createSource(config);
+const definitions = createDefaultScenarioRegistry();
 
 let running: Runner | null = null;
-let runningPath = '';
+let runningKey = '';
 let startVersion = 0;
+let pending: {key: string; promise: Promise<void>; controller: AbortController} | null = null;
+let scheduled: {
+  promise: Promise<void>;
+  timer: number;
+  complete: () => void;
+  fail: (reason: unknown) => void;
+} | null = null;
 
-async function resolveAndRun(): Promise<void> {
-  const version = ++startVersion;
+function currentResolution(): {context: ResolveContext; key: string} {
   const pathname = location.pathname;
+  const locationKey = pathname + location.search;
+  const sortedFacts = Object.fromEntries(
+    Object.entries(facts).sort(([left], [right]) => left.localeCompare(right)),
+  );
+
+  return {
+    context: {
+      path: pathname,
+      url: pathname,
+      anon_id: getAnonId(),
+      session_id: getSessionId(),
+      context: sortedFacts,
+    },
+    key: JSON.stringify([locationKey, sortedFacts]),
+  };
+}
+
+async function resolveAndRun(
+  context: ResolveContext,
+  key: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const version = ++startVersion;
 
   if (running) {
-    if (runningPath === pathname) return;
+    if (runningKey === key) return;
     running.stop('navigated');
     running = null;
+    runningKey = '';
   }
 
-  const context: ResolveContext = {
-    path: pathname,
-    url: pathname,
-    anon_id: getAnonId(),
-    session_id: getSessionId(),
-    context: {...facts},
-  };
-  const scenario = await source.resolve(context);
-  if (version !== startVersion || pathname !== location.pathname) return;
+  const scenario = await source.resolve(context, signal);
+  if (version !== startVersion || key !== currentResolution().key) return;
   if (!scenario || scenario.steps.length === 0) return;
 
-  runningPath = pathname;
-  running = new Runner(scenario, analytics, {}, () => {
+  runningKey = key;
+  running = new Runner(scenario, analytics, {definitions}, () => {
     running = null;
+    runningKey = '';
   });
   await running.start();
 }
 
+function startNow(): Promise<void> {
+  const {context, key} = currentResolution();
+  if (running && runningKey === key) return Promise.resolve();
+  if (pending?.key === key) return pending.promise;
+
+  pending?.controller.abort();
+  const controller = new AbortController();
+  const promise = resolveAndRun(context, key, controller.signal).finally(() => {
+    if (pending?.promise === promise) pending = null;
+  });
+  pending = {key, promise, controller};
+  return promise;
+}
+
 function start(): Promise<void> {
-  return resolveAndRun();
+  if (scheduled) return scheduled.promise;
+
+  let complete!: () => void;
+  let fail!: (reason: unknown) => void;
+  const promise = new Promise<void>((resolve, reject) => {
+    complete = resolve;
+    fail = reject;
+  });
+  const timer = window.setTimeout(() => {
+    scheduled = null;
+    void startNow().then(complete, fail);
+  }, 0);
+
+  scheduled = {promise, timer, complete, fail};
+  return promise;
+}
+
+function cancelScheduledStart(): void {
+  if (!scheduled) return;
+  window.clearTimeout(scheduled.timer);
+  scheduled.complete();
+  scheduled = null;
 }
 
 async function preview(scenario: Scenario): Promise<void> {
+  cancelScheduledStart();
+  pending?.controller.abort();
+  pending = null;
   startVersion += 1;
   running?.stop('preview_replaced');
   running = null;
+  runningKey = '';
   if (scenario.steps.length === 0) return;
 
-  running = new Runner(scenario, analytics, {mode: 'preview'}, () => {
+  running = new Runner(scenario, analytics, {mode: 'preview', definitions}, () => {
     running = null;
   });
   await running.start();

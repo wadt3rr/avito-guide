@@ -109,4 +109,33 @@
     }
   }
 
+  @media (max-width: #{tokens.$breakpoint-tablet - 1px}) {
+    min-height: 200px;
+
+    &__link {
+      min-height: 200px;
+      padding: 20px;
+    }
+  }
+
+  @media (max-width: 479px) {
+    &__link {
+      padding: 18px 16px;
+    }
+
+    &__header {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    &__metadata {
+      margin-bottom: 18px;
+    }
+
+    &__chip {
+      max-width: 100%;
+    }
+  }
+
 }

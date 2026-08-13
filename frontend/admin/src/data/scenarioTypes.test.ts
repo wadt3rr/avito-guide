@@ -3,6 +3,7 @@ import type {IScenario} from './scenarios'
 import {
   buildPreviewScenario,
   changeScenarioType,
+  getStepPlaceholders,
   MAX_SCENARIO_DESCRIPTION_LENGTH,
   MAX_SCENARIO_TITLE_LENGTH,
   MAX_STEP_CONTENT_LENGTH,
@@ -98,6 +99,28 @@ describe('real widget preview payload', () => {
     expect(preview.steps[0]?.selector).toBe('')
     expect(preview.steps[0]?.timeout_sec).toBe(0)
   })
+
+  it.each(['tooltip', 'modal', 'banner'] as const)(
+    'uses the visible %s placeholders when draft content is empty',
+    (type) => {
+      const placeholders = getStepPlaceholders(type)
+      const preview = buildPreviewScenario(draft({
+        type,
+        title: '',
+        steps: [{
+          id: 'empty-step',
+          title: '',
+          text: '',
+          target: type === 'tooltip' ? 'form-title' : '',
+          timeout: type === 'tooltip' ? '5' : '0',
+        }],
+      }))
+
+      expect(preview.title).toBe('Название сценария')
+      expect(preview.steps[0]?.title).toBe(placeholders.title)
+      expect(preview.steps[0]?.content).toBe(placeholders.content)
+    },
+  )
 })
 
 describe('scenario validation', () => {

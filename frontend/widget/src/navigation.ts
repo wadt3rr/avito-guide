@@ -1,12 +1,13 @@
-/** Observes pathname changes made by an SPA without polling the location. */
+/** Observes pathname and query changes made by an SPA without polling the location. */
 export function watchPathname(onChange: () => void): () => void {
-  let pathname = location.pathname;
+  let path = location.pathname + location.search;
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
 
   const notifyIfChanged = () => {
-    if (location.pathname === pathname) return;
-    pathname = location.pathname;
+    const nextPath = location.pathname + location.search;
+    if (nextPath === path) return;
+    path = nextPath;
     onChange();
   };
 

@@ -71,6 +71,10 @@
     &__description {
       max-width: none;
     }
+
+    &__add {
+      min-height: 44px;
+    }
   }
 }
 
@@ -155,6 +159,16 @@
     line-height: 20px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  @media (max-width: 479px) {
+    grid-template-columns: minmax(0, 1fr) 44px;
+
+    &__content {
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 9px;
+      padding: 10px;
+    }
   }
 
 }

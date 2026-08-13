@@ -5,6 +5,23 @@ export const MAX_SCENARIO_DESCRIPTION_LENGTH = 250
 export const MAX_STEP_TITLE_LENGTH = 100
 export const MAX_STEP_CONTENT_LENGTH = 50
 
+export const SCENARIO_TITLE_PLACEHOLDER = 'Название сценария'
+
+export interface StepPlaceholders {
+  title: string
+  content: string
+}
+
+export function getStepPlaceholders(type: ScenarioType): StepPlaceholders {
+  if (type === 'modal') {
+    return {title: 'Заголовок окна', content: 'Текст сообщения'}
+  }
+  if (type === 'banner') {
+    return {title: 'Заголовок баннера', content: 'Текст сообщения'}
+  }
+  return {title: 'Заголовок подсказки', content: 'Текст подсказки'}
+}
+
 export type ScenarioValidationIntent = 'publish' | 'save'
 
 export interface IWidgetPreviewStep {
@@ -133,19 +150,14 @@ export function validateScenario(
 export function buildPreviewScenario(scenario: IScenario): IWidgetPreviewScenario {
   const normalized = normalizeScenarioForSave(scenario)
   const step = firstStep(normalized)
-  const title = step.title.trim() || (
-    normalized.type === 'tooltip'
-      ? 'Подсказка у элемента'
-      : normalized.type === 'modal'
-        ? 'Модальное окно'
-        : 'Информационный баннер'
-  )
-  const content = step.text.trim() || 'Здесь будет текст сообщения для пользователя.'
+  const placeholders = getStepPlaceholders(normalized.type)
+  const title = step.title.trim() || placeholders.title
+  const content = step.text.trim() || placeholders.content
 
   return {
     id: normalized.id || 'admin-widget-preview',
     type: normalized.type,
-    title: normalized.title.trim() || title,
+    title: normalized.title.trim() || SCENARIO_TITLE_PLACEHOLDER,
     steps: [{
       id: step.id || 'admin-widget-preview-step',
       step_order: 1,

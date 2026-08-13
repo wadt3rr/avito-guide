@@ -4,6 +4,7 @@ import type {
     ScenarioStatus,
 } from '../data/scenarios'
 import {normalizeScenarioForSave, normalizeScenarioType} from '../data/scenarioTypes'
+import {apiFetch} from './client'
 
 interface IApiScenarioStep {
     id: string
@@ -119,7 +120,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     const timeoutId = globalThis.setTimeout(() => controller.abort(), apiTimeoutMs)
 
     try {
-        const response = await fetch(url, {
+        const response = await apiFetch(url, {
             ...init,
             signal: controller.signal,
             headers: {
@@ -284,7 +285,7 @@ export async function getScenarioAnalyticsReport(
     const timeoutId = globalThis.setTimeout(() => controller.abort(), apiTimeoutMs)
 
     try {
-        const response = await fetch(`${scenariosUrl}/${id}/analytics/report`, {
+        const response = await apiFetch(`${scenariosUrl}/${id}/analytics/report`, {
             headers: {Accept: 'application/pdf'},
             signal: controller.signal,
         })

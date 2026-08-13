@@ -30,6 +30,12 @@
       grid-template-columns: 1fr;
     }
   }
+
+  @media (max-width: 479px) {
+    .scenario-type-option {
+      min-height: 76px;
+    }
+  }
 }
 
 .scenario-type-option {

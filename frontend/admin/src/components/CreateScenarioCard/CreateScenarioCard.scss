@@ -62,4 +62,10 @@
   &:focus-visible {
     @include mixins.focus-ring;
   }
+
+  @media (max-width: 479px) {
+    min-height: 180px;
+    padding: 20px 16px;
+    text-align: center;
+  }
 }

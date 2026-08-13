@@ -97,6 +97,10 @@ func newRouter(store storage.ScenarioStorage, log *slog.Logger) http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/scenarios", func(w http.ResponseWriter, req *http.Request) {
 			scenarios, err := store.GetScenarios(req.Context())
@@ -532,7 +536,7 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 			http.MethodDelete,
 			http.MethodOptions,
 		},
-		AllowedHeaders:   []string{"Accept", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: false,
 		MaxAge:           300,
 	})(next)

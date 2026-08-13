@@ -160,6 +160,65 @@ export const STYLES = `
 .btn--ghost:hover { background: #f2f1f0; }
 
 @media (max-width: 480px) {
+  .tip {
+    width: min(320px, calc(100vw - 24px));
+    padding: 16px;
+    font-size: 14px;
+  }
+
+  .tip--tooltip,
+  .tip--modal {
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tip--modal {
+    width: calc(100vw - 24px);
+  }
+
+  .tip__head,
+  .tip__foot {
+    flex: 0 0 auto;
+  }
+
+  .tip__body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tip__close {
+    width: 44px;
+    height: 44px;
+    margin: -10px -10px 0 0;
+  }
+
+  .tip__foot {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .tip__actions {
+    min-width: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  .tip--tooltip .btn {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
   .tip--banner {
     grid-template-areas:
       'head'
@@ -167,7 +226,15 @@ export const STYLES = `
       'actions';
     grid-template-columns: minmax(0, 1fr);
     row-gap: 6px;
-    padding: 12px 40px 12px 16px;
+    width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-bottom));
+    padding:
+      max(12px, env(safe-area-inset-top))
+      max(40px, calc(12px + env(safe-area-inset-right)))
+      max(12px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .tip--banner .tip__foot {
@@ -175,8 +242,29 @@ export const STYLES = `
     margin-top: 2px;
   }
 
+  .tip--banner .tip__actions {
+    justify-content: flex-start;
+  }
+
   .tip--banner .tip__actions:only-child { margin-left: 0; }
   .tip--banner .tip__close { top: 10px; right: 10px; }
+}
+
+@media (max-width: 359px) {
+  .tip__foot,
+  .tip__actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .tip__actions:only-child {
+    margin-left: 0;
+  }
+
+  .btn {
+    width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

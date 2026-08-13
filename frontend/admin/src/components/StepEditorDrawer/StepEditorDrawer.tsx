@@ -1,7 +1,11 @@
 import {useEffect, useRef, useState} from 'react'
 import {getAnchorById, getAnchorGroups} from '../../data/anchors'
 import type {IScenarioStep} from '../../data/scenarios'
-import {MAX_STEP_CONTENT_LENGTH, MAX_STEP_TITLE_LENGTH} from '../../data/scenarioTypes'
+import {
+    getStepPlaceholders,
+    MAX_STEP_CONTENT_LENGTH,
+    MAX_STEP_TITLE_LENGTH,
+} from '../../data/scenarioTypes'
 import {Button} from '../Button/Button'
 import {Icon} from '../Icon/Icon'
 import './StepEditorDrawer.scss'
@@ -69,6 +73,7 @@ export function StepEditorDrawer({
     const [timeout, setTimeout] = useState(step.timeout)
     const anchorGroups = getAnchorGroups(scenarioPath, anchorId)
     const previewSelector = toPreviewSelector({anchorId, scope})
+    const placeholders = getStepPlaceholders('tooltip')
 
     useEffect(() => {
         const previousFocus = document.activeElement as HTMLElement | null
@@ -155,6 +160,7 @@ export function StepEditorDrawer({
                             className="drawer-field__control"
                             maxLength={MAX_STEP_TITLE_LENGTH}
                             onChange={(event) => setTitle(event.target.value)}
+                            placeholder={placeholders.title}
                             type="text"
                             value={title}
                         />
@@ -167,6 +173,7 @@ export function StepEditorDrawer({
                             className="drawer-field__control drawer-field__control--textarea"
                             maxLength={MAX_STEP_CONTENT_LENGTH}
                             onChange={(event) => setText(event.target.value)}
+                            placeholder={placeholders.content}
                             rows={4}
                             value={text}
                         />

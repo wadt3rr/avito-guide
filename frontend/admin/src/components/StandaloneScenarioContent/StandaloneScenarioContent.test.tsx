@@ -32,4 +32,24 @@ describe('StandaloneScenarioContent', () => {
     expect(screen.getByLabelText('Заголовок баннера').getAttribute('maxlength')).toBe('100')
     expect(screen.getByLabelText('Текст сообщения').getAttribute('maxlength')).toBe('50')
   })
+
+  it.each([
+    ['modal', 'Заголовок окна'],
+    ['banner', 'Заголовок баннера'],
+  ] as const)('shows %s placeholders while values stay empty', (type, titlePlaceholder) => {
+    render(
+      <StandaloneScenarioContent
+        onChange={vi.fn()}
+        step={{id: 'empty', title: '', text: '', target: '', timeout: '0'}}
+        type={type}
+      />,
+    )
+
+    const title = screen.getByLabelText(type === 'modal' ? 'Заголовок модального окна' : 'Заголовок баннера') as HTMLInputElement
+    const content = screen.getByLabelText('Текст сообщения') as HTMLTextAreaElement
+    expect(title.value).toBe('')
+    expect(title.placeholder).toBe(titlePlaceholder)
+    expect(content.value).toBe('')
+    expect(content.placeholder).toBe('Текст сообщения')
+  })
 })

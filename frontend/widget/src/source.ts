@@ -1,7 +1,7 @@
 import type {ResolveContext, Scenario, WidgetConfig} from './types';
 
 export interface ScenarioSource {
-  resolve(context: ResolveContext): Promise<Scenario | null>;
+  resolve(context: ResolveContext, signal?: AbortSignal): Promise<Scenario | null>;
 }
 
 const MOCK_SCENARIO: Scenario = {
@@ -31,7 +31,7 @@ const MOCK_BANNER: Scenario = {
 };
 
 class MockSource implements ScenarioSource {
-  resolve(context: ResolveContext): Promise<Scenario | null> {
+  resolve(context: ResolveContext, _signal?: AbortSignal): Promise<Scenario | null> {
     if (context.path.startsWith('/create')) return Promise.resolve(MOCK_SCENARIO);
     if (context.path.startsWith('/my')) return Promise.resolve(MOCK_MODAL);
     if (context.path.startsWith('/orders')) return Promise.resolve(MOCK_BANNER);
@@ -42,16 +42,18 @@ class MockSource implements ScenarioSource {
 class HttpSource implements ScenarioSource {
   constructor(private readonly config: WidgetConfig) {}
 
-  async resolve(context: ResolveContext): Promise<Scenario | null> {
+  async resolve(context: ResolveContext, signal?: AbortSignal): Promise<Scenario | null> {
     const base = this.config.apiUrl;
     if (!base) return null;
+    const signalOptions = signal ? {signal} : {};
 
     try {
       const response = this.config.previewId
-        ? await fetch(`${base}/api/v1/embed/scenarios/${this.config.previewId}?preview=1`, {headers: {Accept: 'application/json'}})
+        ? await fetch(`${base}/api/v1/embed/scenarios/${this.config.previewId}?preview=1`, {headers: {Accept: 'application/json'}, ...signalOptions})
         : await fetch(`${base}/api/v1/embed/resolve`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            ...signalOptions,
             body: JSON.stringify({
               ...context,
               url: context.url ?? `${location.origin}${context.path}`,

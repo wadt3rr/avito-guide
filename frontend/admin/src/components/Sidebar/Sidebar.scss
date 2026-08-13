@@ -13,6 +13,10 @@
   background: tokens.$color-surface;
   border-right: 1px solid tokens.$color-border;
 
+  &__close {
+    display: none;
+  }
+
   &__brand {
     padding: 16px 8px 0;
     margin-bottom: 31px;
@@ -85,7 +89,7 @@
   &__footer {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 10px;
     margin-top: auto;
     padding-bottom: 8px;
   }
@@ -97,5 +101,100 @@
     line-height: 20px;
   }
 
-  @include mixins.desktop-only;
+  @media (max-width: #{tokens.$breakpoint-desktop - 1px}) {
+    width: min(288px, calc(100vw - 40px));
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-left: max(8px, env(safe-area-inset-left));
+    visibility: hidden;
+    box-shadow: 12px 0 36px rgb(0 0 0 / 18%);
+    transform: translateX(-104%);
+    transition:
+      transform 180ms ease-out,
+      visibility 0s linear 180ms;
+
+    &--mobile-open {
+      visibility: visible;
+      transform: translateX(0);
+      transition-delay: 0s;
+    }
+
+    .sidebar__brand {
+      padding-right: 44px;
+    }
+
+    .sidebar__close {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      right: 12px;
+      width: 44px;
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      color: tokens.$color-ink-soft;
+      background: transparent;
+      border: 0;
+      border-radius: tokens.$radius-control;
+      cursor: pointer;
+
+      &:hover {
+        color: tokens.$color-ink;
+        background: tokens.$color-surface-muted;
+      }
+
+      &:focus-visible {
+        @include mixins.focus-ring;
+      }
+    }
+
+    .sidebar__link {
+      min-height: 44px;
+    }
+  }
+
+  &__account {
+    display: grid;
+    gap: 2px;
+    padding: 10px 12px;
+    color: tokens.$color-ink-faint;
+    font: 500 11px/16px tokens.$font-ui;
+  }
+
+  &__account-email {
+    overflow: hidden;
+    color: tokens.$color-ink-soft;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__logout {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    color: tokens.$color-ink-soft;
+    background: transparent;
+    border: 0;
+    border-radius: tokens.$radius-control;
+    font: 600 13px/18px tokens.$font-ui;
+    cursor: pointer;
+
+    &:hover {
+      color: tokens.$color-ink;
+      background: tokens.$color-surface-muted;
+    }
+
+    &:focus-visible {
+      @include mixins.focus-ring;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
 }

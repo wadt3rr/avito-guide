@@ -1,3 +1,18 @@
 #root {
   min-height: 100svh;
 }
+
+.forbidden-page {
+  min-height: 100svh;
+  padding: 48px;
+}
+
+.forbidden-page h1 {
+  margin: 0 0 8px;
+  font: 700 30px/36px 'Hanken Grotesk', 'Inter', sans-serif;
+}
+
+.forbidden-page p {
+  margin: 0;
+  color: #565b66;
+}

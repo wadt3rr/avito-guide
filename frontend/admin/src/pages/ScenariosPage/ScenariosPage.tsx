@@ -5,7 +5,6 @@ import {Button} from '../../components/Button/Button'
 import {CreateScenarioCard} from '../../components/CreateScenarioCard/CreateScenarioCard'
 import {Icon} from '../../components/Icon/Icon'
 import {ScenariosCard} from '../../components/ScenariosCard/ScenariosCard'
-import {Sidebar} from '../../components/Sidebar/Sidebar'
 import type {IScenario} from '../../data/scenarios'
 import './ScenariosPage.scss'
 
@@ -51,8 +50,6 @@ export function ScenariosPage() {
 
     return (
         <div className="scenarios-page">
-            <Sidebar/>
-
             <main className="scenarios-page__main">
                 <div className="scenarios-page__content">
                     <div className="scenarios-page__heading-row">

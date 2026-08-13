@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { CITY } from '../data/mock';
 import { anchor } from '../onboarding-anchors';
 
@@ -6,8 +7,30 @@ const UTILITY_LINKS = ['Для бизнеса', 'Карьера в Авито', 
 const PROFILE_NAV = ['Бизнес360', 'Авто', 'Недвижимость', 'Работа', 'Услуги', 'Ещё'];
 
 export function Header({ variant = 'main' }: { variant?: 'main' | 'profile' }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+
+    const desktop = window.matchMedia('(min-width: 769px)');
+    const closeOnDesktop = (event: MediaQueryListEvent) => {
+      if (event.matches) setIsMenuOpen(false);
+    };
+
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => desktop.removeEventListener('change', closeOnDesktop);
+  }, []);
+
   return (
-    <header className="header">
+    <header
+      id="mobile-header-menu"
+      className={`header${isMenuOpen ? ' header--menu-open' : ''}`}
+    >
       <div className="container header__utility">
         <nav className="utility">
           {UTILITY_LINKS.map((link) => (
@@ -36,7 +59,7 @@ export function Header({ variant = 'main' }: { variant?: 'main' | 'profile' }) {
         </div>
       </div>
 
-      <div className="container header__main">
+      <div className={`container header__main header__main--${variant}`}>
         <NavLink to="/" className="logo">
           <span className="logo__dots">
             <i className="logo__dot logo__dot--green" />
@@ -46,6 +69,17 @@ export function Header({ variant = 'main' }: { variant?: 'main' | 'profile' }) {
           </span>
           <span className="logo__word">Avito</span>
         </NavLink>
+
+        <button
+          type="button"
+          className="header__menu-toggle"
+          aria-controls="mobile-header-menu"
+          aria-expanded={isMenuOpen}
+          aria-label={isMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+          onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
+        >
+          <span aria-hidden="true">{isMenuOpen ? '×' : '☰'}</span>
+        </button>
 
         {variant === 'main' ? (
           <>

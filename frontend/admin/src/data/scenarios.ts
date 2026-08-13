@@ -23,7 +23,7 @@ export interface IScenario {
 export function createEmptyStep(index: number): IScenarioStep {
   return {
     id: `step-${Date.now().toString(36)}-${index}`,
-    title: `Шаг ${index + 1}`,
+    title: '',
     text: '',
     target: 'form-title',
     timeout: '5',

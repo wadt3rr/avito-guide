@@ -16,6 +16,8 @@
   z-index: 41;
   inset: 0 0 0 auto;
   width: min(500px, 100vw);
+  height: 100dvh;
+  max-height: 100dvh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   color: tokens.$color-ink;
@@ -75,13 +77,24 @@
     gap: 22px;
     padding: 6px 24px 28px;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-block: 16px;
+    -webkit-overflow-scrolling: touch;
   }
 
   &__footer {
     align-items: center;
+    flex-wrap: wrap;
+    padding-bottom: max(22px, calc(12px + env(safe-area-inset-bottom)));
+
+    .button {
+      min-height: 44px;
+    }
   }
 
   @media (max-width: 560px) {
+    width: 100vw;
+
     &__header,
     &__footer {
       padding-inline: 16px;
@@ -89,6 +102,22 @@
 
     &__body {
       padding-inline: 16px;
+    }
+
+    &__header {
+      padding-top: max(18px, env(safe-area-inset-top));
+    }
+
+  }
+
+  @media (max-width: 479px) {
+    &__footer {
+      align-items: stretch;
+      flex-direction: column;
+
+      .button {
+        width: 100%;
+      }
     }
 
   }
@@ -190,5 +219,11 @@
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step-editor-drawer {
+    animation: none;
   }
 }
