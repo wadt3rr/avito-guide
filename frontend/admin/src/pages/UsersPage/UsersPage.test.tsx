@@ -97,18 +97,20 @@ describe('UsersPage', () => {
     saveSuperAdmin()
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse([admin]))
     vi.stubGlobal('fetch', fetchMock)
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
 
     render(<UsersPage/>)
     fireEvent.click(await screen.findByRole('button', {name: 'Удалить admin@example.com'}))
 
-    expect(confirmSpy).toHaveBeenCalledWith('Вы уверены? Это удалит пользователя и все его сценарии.')
+    expect(screen.getByRole('dialog', {name: 'Удалить пользователя?'})).toBeTruthy()
+    expect(screen.getByText('Вы уверены? Это удалит пользователя и все его сценарии.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', {name: 'Отмена'}))
+
+    expect(screen.queryByRole('dialog', {name: 'Удалить пользователя?'})).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('deletes an admin after confirmation and refetches the server list', async () => {
+  it('deletes an admin from the site modal and refetches the server list', async () => {
     saveSuperAdmin()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     let getRequests = 0
     const fetchMock = vi.fn((_url: string | URL | Request, init?: RequestInit) => {
       if (init?.method === 'DELETE') return Promise.resolve(new Response(null, {status: 204}))
@@ -119,6 +121,7 @@ describe('UsersPage', () => {
 
     render(<UsersPage/>)
     fireEvent.click(await screen.findByRole('button', {name: 'Удалить admin@example.com'}))
+    fireEvent.click(screen.getByRole('button', {name: /^Удалить$/}))
 
     expect(await screen.findByText('Пользователей пока нет')).toBeTruthy()
     expect(fetchMock).toHaveBeenCalledWith(
@@ -144,7 +147,6 @@ describe('UsersPage', () => {
 
   it('keeps the row and reports a delete error', async () => {
     saveSuperAdmin()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResponse([admin]))
       .mockResolvedValueOnce(new Response('failed', {status: 500}))
@@ -152,8 +154,10 @@ describe('UsersPage', () => {
 
     render(<UsersPage/>)
     fireEvent.click(await screen.findByRole('button', {name: 'Удалить admin@example.com'}))
+    fireEvent.click(screen.getByRole('button', {name: /^Удалить$/}))
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Не удалось удалить пользователя'))
-    expect(screen.getByText('admin@example.com')).toBeTruthy()
+    expect(screen.getByRole('dialog', {name: 'Удалить пользователя?'})).toBeTruthy()
+    expect(screen.getAllByText('admin@example.com')).toHaveLength(2)
   })
 })

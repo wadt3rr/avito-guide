@@ -1,11 +1,11 @@
 import {useCallback, useEffect, useState} from 'react'
-import {deleteUser, getUsers, type AdminUser} from '../../api/users'
+import {getUsers, type AdminUser} from '../../api/users'
 import {Button} from '../../components/Button/Button'
 import {Icon} from '../../components/Icon/Icon'
 import {UserCreateModal} from './UserCreateModal'
+import {UserDeleteModal} from './UserDeleteModal'
 import './UsersPage.scss'
 
-const deleteConfirmation = 'Вы уверены? Это удалит пользователя и все его сценарии.'
 const loadErrorMessage = 'Не удалось загрузить пользователей. Проверьте подключение к API.'
 
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
@@ -22,9 +22,8 @@ export function UsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [mutationError, setMutationError] = useState('')
-  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null)
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true)
@@ -62,22 +61,6 @@ export function UsersPage() {
     }
   }, [])
 
-  const handleDelete = async (user: AdminUser) => {
-    if (user.role === 'superadmin' || !window.confirm(deleteConfirmation)) return
-
-    setDeletingId(user.id)
-    setMutationError('')
-
-    try {
-      await deleteUser(user.id)
-      await loadUsers()
-    } catch {
-      setMutationError('Не удалось удалить пользователя. Попробуйте ещё раз.')
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
   return (
     <main className="users-page">
       <header className="users-page__header">
@@ -90,8 +73,6 @@ export function UsersPage() {
           Добавить пользователя
         </Button>
       </header>
-
-      {mutationError && <p className="users-page__mutation-error" role="alert">{mutationError}</p>}
 
       {isLoading && <p className="users-page__state" role="status">Загрузка</p>}
 
@@ -137,11 +118,10 @@ export function UsersPage() {
                 <div className="user-row__action">
                   <Button
                     aria-label={`Удалить ${user.email}`}
-                    disabled={deletingId === user.id}
-                    onClick={() => void handleDelete(user)}
+                    onClick={() => setDeleteTarget(user)}
                     variant="danger"
                   >
-                    {deletingId === user.id ? 'Удаляем…' : 'Удалить'}
+                    Удалить
                   </Button>
                 </div>
               )}
@@ -154,6 +134,11 @@ export function UsersPage() {
         onClose={() => setCreateOpen(false)}
         onCreated={loadUsers}
         open={createOpen}
+      />
+      <UserDeleteModal
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={loadUsers}
+        user={deleteTarget}
       />
     </main>
   )
