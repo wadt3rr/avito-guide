@@ -67,8 +67,8 @@ export function LoginPage() {
             />
           </label>
           {error && <p className="login-form__error" role="alert">{error}</p>}
-          <button disabled={pending} type="submit">
-            {pending ? 'Входим…' : 'Войти'}
+          <button disabled={pending || status === 'loading'} type="submit">
+            {pending || status === 'loading' ? 'Входим…' : 'Войти'}
           </button>
         </form>
       </section>

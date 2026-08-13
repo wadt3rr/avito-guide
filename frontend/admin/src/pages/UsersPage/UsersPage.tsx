@@ -1,80 +1,160 @@
-import {useState, type FormEvent} from 'react'
-import {ApiError} from '../../api/client'
-import {createAdmin} from '../../api/users'
+import {useCallback, useEffect, useState} from 'react'
+import {deleteUser, getUsers, type AdminUser} from '../../api/users'
+import {Button} from '../../components/Button/Button'
+import {Icon} from '../../components/Icon/Icon'
+import {UserCreateModal} from './UserCreateModal'
 import './UsersPage.scss'
 
-export function UsersPage() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+const deleteConfirmation = 'Вы уверены? Это удалит пользователя и все его сценарии.'
+const loadErrorMessage = 'Не удалось загрузить пользователей. Проверьте подключение к API.'
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    setPending(true)
-    setError('')
-    setSuccess('')
+const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
+
+function formatDate(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : dateFormatter.format(date)
+}
+
+export function UsersPage() {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [mutationError, setMutationError] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const loadUsers = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError('')
 
     try {
-      const user = await createAdmin({email: email.trim(), password})
-      setEmail('')
-      setPassword('')
-      setSuccess(`Администратор ${user.email} создан.`)
-    } catch (requestError) {
-      setPassword('')
-      setError(requestError instanceof ApiError && requestError.status === 409
-        ? 'Пользователь с таким email уже существует.'
-        : 'Не удалось создать администратора. Попробуйте ещё раз.')
+      setUsers(await getUsers())
+    } catch {
+      setUsers([])
+      setLoadError(loadErrorMessage)
     } finally {
-      setPending(false)
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    void getUsers()
+      .then((loadedUsers) => {
+        if (!cancelled) setUsers(loadedUsers)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUsers([])
+          setLoadError(loadErrorMessage)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleDelete = async (user: AdminUser) => {
+    if (user.role === 'superadmin' || !window.confirm(deleteConfirmation)) return
+
+    setDeletingId(user.id)
+    setMutationError('')
+
+    try {
+      await deleteUser(user.id)
+      await loadUsers()
+    } catch {
+      setMutationError('Не удалось удалить пользователя. Попробуйте ещё раз.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
   return (
     <main className="users-page">
       <header className="users-page__header">
-        <div>
-          <h1>Пользователи</h1>
-          <p>Создавайте аккаунты для других администраторов продукта.</p>
-        </div>
+        <h1>Пользователи</h1>
+        <Button
+          className="users-page__create-button"
+          leadingIcon={<Icon name="add" size={18}/>}
+          onClick={() => setCreateOpen(true)}
+        >
+          Добавить пользователя
+        </Button>
       </header>
 
-      <section className="users-card" aria-labelledby="create-admin-title">
-        <h2 id="create-admin-title">Новый администратор</h2>
-        <p>Новый пользователь получит доступ к сценариям и аналитике.</p>
+      {mutationError && <p className="users-page__mutation-error" role="alert">{mutationError}</p>}
 
-        <form className="users-form" onSubmit={handleSubmit}>
-          <label>
-            <span>Email</span>
-            <input
-              autoComplete="off"
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              type="email"
-              value={email}
-            />
-          </label>
-          <label>
-            <span>Пароль</span>
-            <input
-              aria-label="Пароль"
-              autoComplete="new-password"
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-            <small>Минимум 8 символов.</small>
-          </label>
-          {error && <p className="users-form__error" role="alert">{error}</p>}
-          {success && <p className="users-form__success" role="status">{success}</p>}
-          <button disabled={pending} type="submit">
-            {pending ? 'Создаём…' : 'Создать администратора'}
-          </button>
-        </form>
-      </section>
+      {isLoading && <p className="users-page__state" role="status">Загрузка</p>}
+
+      {!isLoading && loadError && (
+        <div className="users-page__error" role="alert">
+          <p>{loadError}</p>
+          <Button onClick={() => void loadUsers()} variant="secondary">Повторить</Button>
+        </div>
+      )}
+
+      {!isLoading && !loadError && users.length === 0 && (
+        <p className="users-page__state">Пользователей пока нет</p>
+      )}
+
+      {!isLoading && !loadError && users.length > 0 && (
+        <section aria-label="Список пользователей" className="users-list">
+          {users.map((user) => (
+            <article className="user-row" key={user.id}>
+              <div className="user-row__content">
+                <div className="user-row__identity">
+                  <h2>{user.email}</h2>
+                  <span className={`user-row__role user-row__role--${user.role}`}>
+                    {user.role === 'superadmin' ? 'Суперадминистратор' : 'Администратор'}
+                  </span>
+                </div>
+                <dl className="user-row__metadata">
+                  <div>
+                    <dt>ID</dt>
+                    <dd>{user.id}</dd>
+                  </div>
+                  <div>
+                    <dt>Создан</dt>
+                    <dd>{formatDate(user.created_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Обновлён</dt>
+                    <dd>{formatDate(user.updated_at)}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              {user.role !== 'superadmin' && (
+                <div className="user-row__action">
+                  <Button
+                    aria-label={`Удалить ${user.email}`}
+                    disabled={deletingId === user.id}
+                    onClick={() => void handleDelete(user)}
+                    variant="danger"
+                  >
+                    {deletingId === user.id ? 'Удаляем…' : 'Удалить'}
+                  </Button>
+                </div>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
+
+      <UserCreateModal
+        onClose={() => setCreateOpen(false)}
+        onCreated={loadUsers}
+        open={createOpen}
+      />
     </main>
   )
 }
