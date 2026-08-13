@@ -198,8 +198,6 @@ func (s *stubScenarioStorage) ResolveScenario(ctx context.Context, req models.Re
 	return nil, storage.ErrNotFound
 }
 
-// --- Новые методы для пользователей ---
-
 func (s *stubScenarioStorage) CreateUser(ctx context.Context, user *models.User) (uuid.UUID, error) {
 	id := uuid.New()
 	user.ID = id
@@ -224,6 +222,28 @@ func (s *stubScenarioStorage) GetUserByID(ctx context.Context, id uuid.UUID) (*m
 		return nil, storage.ErrNotFound
 	}
 	return &u, nil
+}
+
+func (s *stubScenarioStorage) ListUsers(ctx context.Context) ([]models.User, error) {
+	users := make([]models.User, 0, len(s.users))
+	for _, u := range s.users {
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+func (s *stubScenarioStorage) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	if _, ok := s.users[id]; !ok {
+		return storage.ErrNotFound
+	}
+	delete(s.users, id)
+	return nil
+}
+
+func addAuthHeader(req *http.Request, role models.UserRole) {
+	user := models.User{ID: uuid.New(), Email: "test@example.com", Role: role}
+	token, _ := auth.NewToken("test-secret", user, time.Hour)
+	req.Header.Set("Authorization", "Bearer "+token)
 }
 
 func TestRouter_Scenarios(t *testing.T) {
@@ -266,7 +286,7 @@ func TestRouter_Scenarios(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := newStubStorage()
-			router := newRouter(store, setupLogger(envLocal))
+			router := newRouter(store, setupLogger(envLocal), "test-secret")
 
 			var req *http.Request
 			if tt.body != "" {
@@ -274,6 +294,9 @@ func TestRouter_Scenarios(t *testing.T) {
 			} else {
 				req = httptest.NewRequest(tt.method, tt.path, nil)
 			}
+
+			addAuthHeader(req, models.UserRoleAdmin)
+
 			res := httptest.NewRecorder()
 
 			router.ServeHTTP(res, req)
@@ -351,8 +374,9 @@ func TestRouter_UpdateScenario(t *testing.T) {
 				}
 			}
 
-			router := newRouter(store, setupLogger(envLocal))
+			router := newRouter(store, setupLogger(envLocal), "test-secret")
 			req := httptest.NewRequest(http.MethodPatch, "/api/v1/scenarios/"+tt.id.String(), strings.NewReader(tt.body))
+			addAuthHeader(req, models.UserRoleAdmin)
 			res := httptest.NewRecorder()
 
 			router.ServeHTTP(res, req)
@@ -374,12 +398,13 @@ func TestRouter_UpdateScenario(t *testing.T) {
 
 func TestRouter_PersistsScenarioType(t *testing.T) {
 	store := newStubStorage()
-	router := newRouter(store, setupLogger(envLocal))
+	router := newRouter(store, setupLogger(envLocal), "test-secret")
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/v1/scenarios",
 		strings.NewReader(`{"title":"Важное сообщение","type":"modal","status":"draft"}`),
 	)
+	addAuthHeader(req, models.UserRoleAdmin)
 	res := httptest.NewRecorder()
 
 	router.ServeHTTP(res, req)
@@ -402,8 +427,9 @@ func TestRouter_DeleteScenario(t *testing.T) {
 	store := newStubStorage()
 	store.scenarios[scenarioID] = models.Scenario{ID: scenarioID, Title: "Удаляемый сценарий"}
 
-	router := newRouter(store, setupLogger(envLocal))
+	router := newRouter(store, setupLogger(envLocal), "test-secret")
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/scenarios/"+scenarioID.String(), nil)
+	addAuthHeader(req, models.UserRoleAdmin)
 	res := httptest.NewRecorder()
 
 	router.ServeHTTP(res, req)
@@ -424,8 +450,9 @@ func TestRouter_AnalyticsReport(t *testing.T) {
 		{ScenarioID: scenarioID, SessionID: "session-1", EventType: models.EventFinished},
 	}
 
-	router := newRouter(store, setupLogger(envLocal))
+	router := newRouter(store, setupLogger(envLocal), "test-secret")
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/scenarios/"+scenarioID.String()+"/analytics/report", nil)
+	addAuthHeader(req, models.UserRoleAdmin)
 	res := httptest.NewRecorder()
 
 	router.ServeHTTP(res, req)
@@ -444,9 +471,10 @@ func TestRouter_AnalyticsReport(t *testing.T) {
 
 func TestNewRouter_InvalidJSON(t *testing.T) {
 	store := newStubStorage()
-	router := newRouter(store, setupLogger(envLocal))
+	router := newRouter(store, setupLogger(envLocal), "test-secret")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/scenarios", strings.NewReader("{bad json}"))
+	addAuthHeader(req, models.UserRoleAdmin)
 	res := httptest.NewRecorder()
 
 	router.ServeHTTP(res, req)
@@ -469,13 +497,15 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 		body         string
 		wantCode     int
 		wantContains string
+		needsAuth    bool
 	}{
 		{
 			name:         "get progress returns not found for missing progress",
 			method:       http.MethodGet,
 			path:         "/api/v1/scenarios/" + scenarioID.String() + "/progress?session_id=session-1",
 			wantCode:     http.StatusNotFound,
-			wantContains: "scenario not found",
+			wantContains: "progress not found",
+			needsAuth:    false,
 		},
 		{
 			name:         "upsert progress returns created progress",
@@ -484,6 +514,7 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 			body:         `{"session_id":"session-1","status":"in_progress","current_step":2}`,
 			wantCode:     http.StatusOK,
 			wantContains: "in_progress",
+			needsAuth:    false,
 		},
 		{
 			name:         "create analytics event",
@@ -492,6 +523,7 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 			body:         fmt.Sprintf(`{"scenario_id":"%s","session_id":"session-1","event_type":"started"}`, scenarioID.String()),
 			wantCode:     http.StatusCreated,
 			wantContains: "status",
+			needsAuth:    false,
 		},
 		{
 			name:         "get analytics for scenario",
@@ -499,6 +531,7 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 			path:         "/api/v1/scenarios/" + scenarioID.String() + "/analytics",
 			wantCode:     http.StatusOK,
 			wantContains: "started",
+			needsAuth:    true,
 		},
 	}
 
@@ -507,7 +540,7 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 			store := newStubStorage()
 			store.scenarios[scenarioID] = models.Scenario{ID: scenarioID, Title: "Demo", Status: "draft"}
 
-			router := newRouter(store, setupLogger(envLocal))
+			router := newRouter(store, setupLogger(envLocal), "test-secret")
 
 			var req *http.Request
 			if tt.body != "" {
@@ -515,6 +548,11 @@ func TestRouter_ProgressAndAnalytics(t *testing.T) {
 			} else {
 				req = httptest.NewRequest(tt.method, tt.path, nil)
 			}
+
+			if tt.needsAuth {
+				addAuthHeader(req, models.UserRoleAdmin)
+			}
+
 			res := httptest.NewRecorder()
 
 			router.ServeHTTP(res, req)
@@ -536,33 +574,37 @@ func TestRouter_Auth(t *testing.T) {
 	existingUserID := uuid.New()
 
 	tests := []struct {
-		name       string
-		method     string
-		path       string
-		body       string
-		wantCode   int
-		setupStore func(store *stubScenarioStorage)
+		name         string
+		method       string
+		path         string
+		body         string
+		wantCode     int
+		asSuperAdmin bool
+		setupStore   func(store *stubScenarioStorage)
 	}{
 		{
-			name:     "register success",
-			method:   http.MethodPost,
-			path:     "/api/v1/auth/register",
-			body:     `{"email":"new@example.com","password":"password123"}`,
-			wantCode: http.StatusCreated,
+			name:         "register success",
+			method:       http.MethodPost,
+			path:         "/api/v1/auth/register",
+			body:         `{"email":"new@example.com","password":"password123"}`,
+			wantCode:     http.StatusCreated,
+			asSuperAdmin: true,
 		},
 		{
-			name:     "register missing fields",
-			method:   http.MethodPost,
-			path:     "/api/v1/auth/register",
-			body:     `{"email":"","password":""}`,
-			wantCode: http.StatusBadRequest,
+			name:         "register missing fields",
+			method:       http.MethodPost,
+			path:         "/api/v1/auth/register",
+			body:         `{"email":"","password":""}`,
+			wantCode:     http.StatusBadRequest,
+			asSuperAdmin: true,
 		},
 		{
-			name:     "login success",
-			method:   http.MethodPost,
-			path:     "/api/v1/auth/login",
-			body:     fmt.Sprintf(`{"email":"%s","password":"%s"}`, validEmail, validPassword),
-			wantCode: http.StatusOK,
+			name:         "login success",
+			method:       http.MethodPost,
+			path:         "/api/v1/auth/login",
+			body:         fmt.Sprintf(`{"email":"%s","password":"%s"}`, validEmail, validPassword),
+			wantCode:     http.StatusOK,
+			asSuperAdmin: false,
 			setupStore: func(store *stubScenarioStorage) {
 				store.users[existingUserID] = models.User{
 					ID:           existingUserID,
@@ -573,11 +615,12 @@ func TestRouter_Auth(t *testing.T) {
 			},
 		},
 		{
-			name:     "login incorrect password",
-			method:   http.MethodPost,
-			path:     "/api/v1/auth/login",
-			body:     fmt.Sprintf(`{"email":"%s","password":"wrongpassword"}`, validEmail),
-			wantCode: http.StatusUnauthorized,
+			name:         "login incorrect password",
+			method:       http.MethodPost,
+			path:         "/api/v1/auth/login",
+			body:         fmt.Sprintf(`{"email":"%s","password":"wrongpassword"}`, validEmail),
+			wantCode:     http.StatusUnauthorized,
+			asSuperAdmin: false,
 			setupStore: func(store *stubScenarioStorage) {
 				store.users[existingUserID] = models.User{
 					ID:           existingUserID,
@@ -587,11 +630,12 @@ func TestRouter_Auth(t *testing.T) {
 			},
 		},
 		{
-			name:     "login non-existent user",
-			method:   http.MethodPost,
-			path:     "/api/v1/auth/login",
-			body:     `{"email":"notfound@example.com","password":"password123"}`,
-			wantCode: http.StatusUnauthorized,
+			name:         "login non-existent user",
+			method:       http.MethodPost,
+			path:         "/api/v1/auth/login",
+			body:         `{"email":"notfound@example.com","password":"password123"}`,
+			wantCode:     http.StatusUnauthorized,
+			asSuperAdmin: false,
 		},
 	}
 
@@ -602,10 +646,14 @@ func TestRouter_Auth(t *testing.T) {
 				tt.setupStore(store)
 			}
 
-			router := newRouter(store, setupLogger(envLocal))
+			router := newRouter(store, setupLogger(envLocal), "test-secret")
 			req := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
-			res := httptest.NewRecorder()
 
+			if tt.asSuperAdmin {
+				addAuthHeader(req, models.UserRoleSuperAdmin)
+			}
+
+			res := httptest.NewRecorder()
 			router.ServeHTTP(res, req)
 
 			if res.Code != tt.wantCode {
@@ -613,6 +661,79 @@ func TestRouter_Auth(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnsureSuperAdmin(t *testing.T) {
+	ctx := context.Background()
+	store := newStubStorage()
+
+	err := ensureSuperAdmin(ctx, store, "super@example.com", "secure123", envLocal)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	user, err := store.GetUserByEmail(ctx, "super@example.com")
+	if err != nil {
+		t.Fatalf("expected user to be created")
+	}
+	if user.Role != models.UserRoleSuperAdmin {
+		t.Fatalf("expected superadmin role, got %s", user.Role)
+	}
+
+	err = ensureSuperAdmin(ctx, store, "super@example.com", "secure123", envLocal)
+	if err != nil {
+		t.Fatalf("expected no error on duplicate admin creation, got: %v", err)
+	}
+}
+
+func TestRouter_SuperAdminUsers(t *testing.T) {
+	store := newStubStorage()
+	secret := "test-secret"
+	router := newRouter(store, setupLogger(envLocal), secret)
+
+	adminUser := models.User{
+		ID:    uuid.New(),
+		Email: "super@example.com",
+		Role:  models.UserRoleSuperAdmin,
+	}
+	store.users[adminUser.ID] = adminUser
+
+	targetUserID := uuid.New()
+	store.users[targetUserID] = models.User{
+		ID:    targetUserID,
+		Email: "user@example.com",
+		Role:  models.UserRoleAdmin,
+	}
+
+	token, _ := auth.NewToken(secret, adminUser, time.Hour)
+
+	t.Run("list users success", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		res := httptest.NewRecorder()
+
+		router.ServeHTTP(res, req)
+
+		if res.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", res.Code)
+		}
+	})
+
+	t.Run("delete user success", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/api/v1/users/"+targetUserID.String(), nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		res := httptest.NewRecorder()
+
+		router.ServeHTTP(res, req)
+
+		if res.Code != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", res.Code)
+		}
+
+		if _, exists := store.users[targetUserID]; exists {
+			t.Fatal("expected user to be deleted from storage")
+		}
+	})
 }
 
 func TestErrors(t *testing.T) {

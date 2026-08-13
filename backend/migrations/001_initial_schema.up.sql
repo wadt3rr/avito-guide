@@ -1,5 +1,17 @@
+CREATE TABLE users (
+   id            UUID PRIMARY KEY,
+   email         VARCHAR(255) NOT NULL UNIQUE,
+   password_hash TEXT NOT NULL,
+   role          VARCHAR(20) NOT NULL DEFAULT 'admin',
+   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+   CONSTRAINT users_role_check CHECK (role IN ('superadmin', 'admin'))
+);
+
 CREATE TABLE scenarios (
     id            UUID PRIMARY KEY,
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     type          VARCHAR(20) NOT NULL DEFAULT 'tooltip',
     title         VARCHAR(100) NOT NULL,
     description   VARCHAR(250),
@@ -52,18 +64,8 @@ CREATE TABLE analytics_events (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE users (
-    id            UUID PRIMARY KEY,
-    email         VARCHAR(255) NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    role          VARCHAR(20) NOT NULL DEFAULT 'admin',
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT admins_role_check CHECK (role IN ('superadmin', 'admin'))
-);
-
-CREATE INDEX admins_email_idx ON users (email);
+CREATE INDEX users_email_idx ON users (email);
 
 CREATE INDEX scenarios_published_idx
     ON scenarios (published_at)

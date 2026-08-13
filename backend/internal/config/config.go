@@ -12,6 +12,8 @@ type Config struct {
 	StorageDSN     string `env:"STORAGE_DSN" env-required:"true"`
 	MigrationsPath string `env:"MIGRATIONS_PATH" env-required:"true"`
 	HTTPServer     HTTPServer
+	SuperAdmin     SuperAdmin
+	JWTSecret      string `env:"JWT_SECRET" env-default:"secret"`
 }
 
 type HTTPServer struct {
@@ -19,6 +21,11 @@ type HTTPServer struct {
 	Timeout            time.Duration `env:"HTTP_TIMEOUT" env-default:"5s"`
 	IdleTimeout        time.Duration `env:"HTTP_IDLE_TIMEOUT" env-default:"60s"`
 	CORSAllowedOrigins []string      `env:"CORS_ALLOWED_ORIGINS" env-separator:"," env-default:"*"`
+}
+
+type SuperAdmin struct {
+	Password string `env:"SUPERADMIN_PASSWORD" env-required:"true"`
+	Email    string `env:"SUPERADMIN_EMAIL" env-required:"true"`
 }
 
 func MustLoad() *Config {

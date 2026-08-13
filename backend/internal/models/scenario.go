@@ -25,6 +25,7 @@ func (t ScenarioType) Valid() bool {
 
 type Scenario struct {
 	ID           uuid.UUID         `json:"id"`
+	UserID       uuid.UUID         `json:"user_id"`
 	Type         ScenarioType      `json:"type"`
 	Title        string            `json:"title"`
 	Description  *string           `json:"description"`
