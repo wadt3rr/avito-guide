@@ -1,5 +1,4 @@
 import type {AuthUser} from '../auth/session'
-import {createDevAdmin, isDevAuthEnabled} from '../auth/dev-auth'
 import {apiJson} from './client'
 
 export interface CreateAdminInput {
@@ -7,11 +6,26 @@ export interface CreateAdminInput {
   password: string
 }
 
-export function createAdmin(input: CreateAdminInput) {
-  if (isDevAuthEnabled) return Promise.resolve(createDevAdmin(input.email))
+export interface CreateAdminResult {
+  id: string
+}
 
-  return apiJson<AuthUser>('/api/v1/users', {
+export interface AdminUser extends AuthUser {
+  created_at: string
+  updated_at: string
+}
+
+export function getUsers() {
+  return apiJson<AdminUser[]>('/api/v1/users')
+}
+
+export function createAdmin(input: CreateAdminInput) {
+  return apiJson<CreateAdminResult>('/api/v1/auth/register', {
     method: 'POST',
     body: JSON.stringify(input),
   })
+}
+
+export function deleteUser(id: string) {
+  return apiJson<void>(`/api/v1/users/${id}`, {method: 'DELETE'})
 }

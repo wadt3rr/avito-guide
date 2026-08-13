@@ -648,7 +648,7 @@ func (s *Storage) GetUserByEmail(ctx context.Context, email string) (*models.Use
 
 	err := s.pool.QueryRow(
 		ctx,
-		`SELECT id, email, password_hash, role, created_at, updated_at FROM users WHERE email = $1`,
+		`SELECT id, email, password_hash, role, created_at, updated_at FROM users WHERE lower(email) = lower($1)`,
 		email,
 	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
@@ -678,6 +678,29 @@ func (s *Storage) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, 
 	}
 
 	return &u, nil
+}
+
+func (s *Storage) UpdateUserAuth(
+	ctx context.Context,
+	id uuid.UUID,
+	email, passwordHash string,
+	role models.UserRole,
+) error {
+	const op = "postgres.Storage.UpdateUserAuth"
+
+	tag, err := s.pool.Exec(
+		ctx,
+		`UPDATE users SET email = $1, password_hash = $2, role = $3, updated_at = $4 WHERE id = $5`,
+		email, passwordHash, role, time.Now().UTC(), id,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+
+	return nil
 }
 
 func (s *Storage) ListUsers(ctx context.Context) ([]models.User, error) {

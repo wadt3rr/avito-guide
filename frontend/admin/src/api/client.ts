@@ -16,6 +16,10 @@ export class ApiError extends Error {
 
 export async function apiFetch(path: string, init: RequestInit = {}) {
   const session = readSession()
+  const explicitAuthorization = new Headers(init.headers).get('Authorization')
+  const requestToken = explicitAuthorization?.startsWith('Bearer ')
+    ? explicitAuthorization.slice('Bearer '.length)
+    : session?.token
   const response = await fetch(path.startsWith('http') ? path : `${apiOrigin}${path}`, {
     ...init,
     headers: {
@@ -27,8 +31,11 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   })
 
   if (response.status === 401) {
-    clearSession()
-    window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
+    const currentSession = readSession()
+    if (requestToken && currentSession?.token === requestToken) {
+      clearSession()
+      window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
+    }
   }
 
   return response

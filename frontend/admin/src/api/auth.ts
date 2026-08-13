@@ -1,16 +1,19 @@
-import type {AuthSession, AuthUser} from '../auth/session'
-import {createDevSession, isDevAuthEnabled} from '../auth/dev-auth'
+import type {AuthUser} from '../auth/session'
 import {apiJson} from './client'
 
-export function authenticate(email: string, password: string) {
-  if (isDevAuthEnabled) return Promise.resolve(createDevSession(email))
+interface AuthTokenResponse {
+  token: string
+}
 
-  return apiJson<AuthSession>('/api/v1/auth/login', {
+export function authenticate(email: string, password: string) {
+  return apiJson<AuthTokenResponse>('/api/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify({email, password}),
   })
 }
 
-export function getCurrentUser() {
-  return apiJson<AuthUser>('/api/v1/auth/me')
+export function getCurrentUser(token?: string) {
+  return apiJson<AuthUser>('/api/v1/auth/me', token ? {
+    headers: {Authorization: `Bearer ${token}`},
+  } : undefined)
 }
