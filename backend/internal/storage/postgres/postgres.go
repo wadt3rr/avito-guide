@@ -115,8 +115,8 @@ func (s *Storage) CreateScenario(ctx context.Context, scenario *models.Scenario)
 
 	_, err = tx.Exec(
 		ctx,
-		`INSERT INTO scenarios (id, type, title, description, status, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		id, scenarioType, scenario.Title, scenario.Description, scenario.Status, now, now,
+		`INSERT INTO scenarios (id, type, title, description, status, created_at, updated_at, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		id, scenarioType, scenario.Title, scenario.Description, scenario.Status, now, now, scenario.UserID,
 	)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("%s: failed to create scenario: %w", op, err)
@@ -154,7 +154,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		`SELECT id, user_id ,type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         ORDER BY created_at DESC`,
 	)
@@ -170,6 +170,7 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 		var rawMatch []byte
 		err = rows.Scan(
 			&sc.ID,
+			&sc.UserID,
 			&sc.Type,
 			&sc.Title,
 			&sc.Description,
@@ -213,11 +214,12 @@ func (s *Storage) GetScenarioByID(ctx context.Context, id uuid.UUID) (*models.Sc
 	var rawMatch []byte
 
 	err = tx.QueryRow(ctx, `
-		SELECT id, type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
+		SELECT id, user_id, type, title, description, status, published_at, url_pattern, match_context, priority, created_at, updated_at
         FROM scenarios
         WHERE id = $1
 	`, id).Scan(
 		&sc.ID,
+		&sc.UserID,
 		&sc.Type,
 		&sc.Title,
 		&sc.Description,
@@ -676,4 +678,40 @@ func (s *Storage) GetUserByID(ctx context.Context, id uuid.UUID) (*models.User, 
 	}
 
 	return &u, nil
+}
+
+func (s *Storage) ListUsers(ctx context.Context) ([]models.User, error) {
+	const op = "postgres.Storage.ListUsers"
+
+	var users []models.User
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT id, email, role, created_at, updated_at FROM users`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u models.User
+		_ = rows.Scan(&u.ID, &u.Email, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	return users, nil
+}
+
+func (s *Storage) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	const op = "postgres.Storage.DeleteUser"
+
+	tag, err := s.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return storage.ErrNotFound
+	}
+	return nil
 }
