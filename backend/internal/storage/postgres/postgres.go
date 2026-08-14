@@ -680,6 +680,13 @@ func (s *Storage) GetScenarioAnalytics(ctx context.Context, scenarioID uuid.UUID
 
 func (s *Storage) CreateUser(ctx context.Context, user *models.User) (uuid.UUID, error) {
 	const op = "postgres.Storage.CreateUser"
+	if user.ID == uuid.Nil {
+		id, err := uuid.NewV7()
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("%s: failed to create user id: %w", op, err)
+		}
+		user.ID = id
+	}
 
 	_, err := s.pool.Exec(
 		ctx,

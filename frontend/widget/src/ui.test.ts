@@ -107,7 +107,7 @@ describe('Ui variants', () => {
     expect(tip.getAttribute('role')).toBe('dialog');
     expect(tip.hasAttribute('aria-modal')).toBe(false);
     expect(tip.hasAttribute('tabindex')).toBe(false);
-    expect(root.activeElement).toBe(root.querySelector('.tip__close'));
+    expect(root.activeElement).toBe(root.querySelector('.btn--primary'));
     const lastAction = root.querySelector<HTMLElement>('.btn--primary')!;
     lastAction.focus();
     const tab = new KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Tab'});
@@ -144,7 +144,7 @@ describe('Ui variants', () => {
     expect(modal.getAttribute('role')).toBe('dialog');
     expect(modal.getAttribute('aria-modal')).toBe('true');
     expect(modal.hasAttribute('tabindex')).toBe(false);
-    expect(root.activeElement).toBe(root.querySelector('.tip__close'));
+    expect(root.activeElement).toBe(root.querySelector('.btn--primary'));
     expect(trigger.inert).toBe(true);
     expect(document.body.style.overflow).toBe('hidden');
     expect(root.querySelector('.spot')?.hasAttribute('hidden')).toBe(true);

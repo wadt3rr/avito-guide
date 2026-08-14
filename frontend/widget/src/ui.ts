@@ -127,7 +127,9 @@ export class Ui {
       }
     }
     if (this.presentation.focusMode === 'trap') this.disableModalBackground();
-    this.tip.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus({preventScroll: true});
+    const initialFocus = this.tip.querySelector<HTMLElement>('.btn--primary')
+      ?? this.tip.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+    initialFocus?.focus({preventScroll: true});
   }
 
   private disableModalBackground(): void {
