@@ -15,7 +15,7 @@ export interface Step {
 export interface Scenario {
   id: string;
   title: string;
-  type?: ScenarioType;
+  type: ScenarioType;
   steps: Step[];
 }
 

@@ -81,10 +81,19 @@ describe('UsersPage', () => {
 
     render(<UsersPage/>)
     await screen.findByText('super@example.com')
-    fireEvent.click(screen.getByRole('button', {name: 'Добавить пользователя'}))
+    const createTrigger = screen.getByRole('button', {name: 'Добавить пользователя'})
+    createTrigger.focus()
+    fireEvent.click(createTrigger)
 
-    expect(screen.getByRole('dialog', {name: 'Новый администратор'})).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Email'), {target: {value: 'new@example.com'}})
+    const createDialog = screen.getByRole('dialog', {name: 'Новый администратор'})
+    const emailInput = screen.getByLabelText('Email')
+    expect(createDialog).toBeTruthy()
+    expect(document.activeElement).toBe(emailInput)
+    const submitButton = screen.getByRole('button', {name: 'Создать администратора'})
+    submitButton.focus()
+    fireEvent.keyDown(submitButton, {key: 'Tab'})
+    expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Закрыть'}))
+    fireEvent.change(emailInput, {target: {value: 'new@example.com'}})
     fireEvent.change(screen.getByLabelText('Пароль'), {target: {value: 'password123'}})
     fireEvent.click(screen.getByRole('button', {name: 'Создать администратора'}))
 
@@ -99,13 +108,17 @@ describe('UsersPage', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     render(<UsersPage/>)
-    fireEvent.click(await screen.findByRole('button', {name: 'Удалить admin@example.com'}))
+    const deleteTrigger = await screen.findByRole('button', {name: 'Удалить admin@example.com'})
+    deleteTrigger.focus()
+    fireEvent.click(deleteTrigger)
 
     expect(screen.getByRole('dialog', {name: 'Удалить пользователя?'})).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole('button', {name: 'Закрыть'}))
     expect(screen.getByText('Вы уверены? Это удалит пользователя и все его сценарии.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', {name: 'Отмена'}))
 
     expect(screen.queryByRole('dialog', {name: 'Удалить пользователя?'})).toBeNull()
+    expect(document.activeElement).toBe(deleteTrigger)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 

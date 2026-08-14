@@ -21,14 +21,13 @@ function definition(type: ScenarioType): ScenarioDefinition {
 }
 
 describe('ScenarioDefinitionRegistry', () => {
-  it('resolves registered definitions and falls back to tooltip', () => {
+  it('resolves registered definitions and rejects unknown types', () => {
     const tooltip = definition('tooltip');
     const modal = definition('modal');
     const registry = new ScenarioDefinitionRegistry([tooltip, modal]);
 
     expect(registry.resolve('modal')).toBe(modal);
-    expect(registry.resolve(undefined)).toBe(tooltip);
-    expect(registry.resolve('future-variant')).toBe(tooltip);
+    expect(() => registry.resolve('banner')).toThrow('Unknown scenario definition: banner');
   });
 
   it('rejects duplicate definitions instead of silently replacing one', () => {
@@ -37,9 +36,8 @@ describe('ScenarioDefinitionRegistry', () => {
     ).toThrow('Duplicate scenario definition: tooltip');
   });
 
-  it('requires a tooltip fallback definition', () => {
-    expect(() => new ScenarioDefinitionRegistry([definition('modal')])).toThrow(
-      'Tooltip scenario definition is required',
-    );
+  it('supports a registry without a tooltip fallback', () => {
+    const modal = definition('modal');
+    expect(new ScenarioDefinitionRegistry([modal]).resolve('modal')).toBe(modal);
   });
 });

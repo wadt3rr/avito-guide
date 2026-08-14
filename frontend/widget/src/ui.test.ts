@@ -93,6 +93,7 @@ describe('Ui variants', () => {
   it('renders multi-step tooltip navigation next to its target', () => {
     const target = document.createElement('button');
     document.body.append(target);
+    target.focus();
     const ui = new Ui(handlers);
 
     ui.render(view('tooltip', 2), target);
@@ -102,6 +103,16 @@ describe('Ui variants', () => {
     expect(root.querySelector('.spot')?.hasAttribute('hidden')).toBe(false);
     expect(root.querySelector('.tip__count')?.textContent).toBe('1 из 2');
     expect(root.querySelector('.btn--primary')?.textContent).toBe('Далее');
+    const tip = root.querySelector<HTMLElement>('.tip--tooltip')!;
+    expect(tip.getAttribute('role')).toBe('dialog');
+    expect(tip.hasAttribute('aria-modal')).toBe(false);
+    expect(tip.hasAttribute('tabindex')).toBe(false);
+    expect(root.activeElement).toBe(root.querySelector('.tip__close'));
+    const lastAction = root.querySelector<HTMLElement>('.btn--primary')!;
+    lastAction.focus();
+    const tab = new KeyboardEvent('keydown', {bubbles: true, cancelable: true, key: 'Tab'});
+    lastAction.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(false);
     ui.destroy();
   });
 
@@ -121,19 +132,45 @@ describe('Ui variants', () => {
   });
 
   it('renders a standalone blocking modal without tour chrome', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
     const ui = new Ui(handlers, createStandalonePresentation('modal', true));
 
     ui.render(view('modal'));
 
     const root = shadowRoot();
-    expect(root.querySelector('.tip--modal')).not.toBeNull();
+    const modal = root.querySelector<HTMLElement>('.tip--modal')!;
+    expect(modal.getAttribute('role')).toBe('dialog');
+    expect(modal.getAttribute('aria-modal')).toBe('true');
+    expect(modal.hasAttribute('tabindex')).toBe(false);
+    expect(root.activeElement).toBe(root.querySelector('.tip__close'));
+    expect(trigger.inert).toBe(true);
+    expect(document.body.style.overflow).toBe('hidden');
     expect(root.querySelector('.spot')?.hasAttribute('hidden')).toBe(true);
     expect(root.querySelector('.tip__count')).toBeNull();
     expect((root.querySelector('.catch') as HTMLElement).style.pointerEvents).toBe('auto');
+    expect(STYLES).toMatch(/\.tip--modal\s*\{[^}]*max-height:/s);
+    expect(STYLES).toMatch(/\.tip--modal \.tip__body\s*\{[^}]*overflow-y:\s*auto/s);
+    const lastAction = root.querySelector<HTMLElement>('.btn--primary')!;
+    const firstAction = root.querySelector<HTMLElement>('.tip__close')!;
+    lastAction.focus();
+    lastAction.dispatchEvent(new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+    }));
+    expect(root.activeElement).toBe(firstAction);
     ui.destroy();
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.inert).not.toBe(true);
+    expect(document.body.style.overflow).toBe('');
   });
 
   it('renders a standalone non-blocking banner without tour chrome', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
     const ui = new Ui(handlers, createStandalonePresentation('banner', false));
 
     ui.render(view('banner'));
@@ -143,6 +180,7 @@ describe('Ui variants', () => {
     expect(root.querySelector('.spot')?.hasAttribute('hidden')).toBe(true);
     expect(root.querySelector('.tip__count')).toBeNull();
     expect((root.querySelector('.catch') as HTMLElement).style.pointerEvents).toBe('none');
+    expect(document.activeElement).toBe(trigger);
     ui.destroy();
   });
 });

@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState} from 'react'
+import {useRef, useState} from 'react'
 import {getAnchorById, getAnchorGroups} from '../../data/anchors'
 import type {IScenarioStep} from '../../data/scenarios'
 import {
@@ -8,6 +8,7 @@ import {
 } from '../../data/scenarioTypes'
 import {Button} from '../Button/Button'
 import {Icon} from '../Icon/Icon'
+import {useModalFocus} from '../../hooks/useModalFocus'
 import './StepEditorDrawer.scss'
 
 interface IStepEditorDrawer {
@@ -62,6 +63,7 @@ export function StepEditorDrawer({
                                  }: IStepEditorDrawer) {
     const drawerRef = useRef<HTMLElement>(null)
     const closeButtonRef = useRef<HTMLButtonElement>(null)
+    const modalRootRef = useRef<HTMLDivElement>(null)
     const [title, setTitle] = useState(step.title)
     const [text, setText] = useState(step.text)
     const initialTarget = splitTarget(step.target)
@@ -75,53 +77,16 @@ export function StepEditorDrawer({
     const previewSelector = toPreviewSelector({anchorId, scope})
     const placeholders = getStepPlaceholders('tooltip')
 
-    useEffect(() => {
-        const previousFocus = document.activeElement as HTMLElement | null
-        const backgroundElements = [
-            document.querySelector<HTMLElement>('.scenario-editor-page__main'),
-            document.querySelector<HTMLElement>('.sidebar'),
-        ].filter((element): element is HTMLElement => element !== null)
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose()
-
-            if (event.key !== 'Tab' || !drawerRef.current) return
-
-            const focusableElements = drawerRef.current.querySelectorAll<HTMLElement>(
-                'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled)',
-            )
-            const firstElement = focusableElements[0]
-            const lastElement = focusableElements[focusableElements.length - 1]
-
-            if (event.shiftKey && document.activeElement === firstElement) {
-                event.preventDefault()
-                lastElement?.focus()
-            } else if (!event.shiftKey && document.activeElement === lastElement) {
-                event.preventDefault()
-                firstElement?.focus()
-            }
-        }
-
-        const previousOverflow = document.body.style.overflow
-        document.body.style.overflow = 'hidden'
-        backgroundElements.forEach((element) => {
-            element.inert = true
-        })
-        window.addEventListener('keydown', handleKeyDown)
-        closeButtonRef.current?.focus()
-
-        return () => {
-            document.body.style.overflow = previousOverflow
-            backgroundElements.forEach((element) => {
-                element.inert = false
-            })
-            window.removeEventListener('keydown', handleKeyDown)
-            previousFocus?.focus()
-        }
-    }, [onClose])
+    useModalFocus({
+        active: true,
+        containerRef: drawerRef,
+        initialFocusRef: closeButtonRef,
+        modalRootRef,
+        onClose,
+    })
 
     return (
-        <>
+        <div className="step-editor-modal" ref={modalRootRef}>
             <button
                 aria-label="Закрыть редактор шага"
                 className="step-editor-backdrop"
@@ -284,6 +249,6 @@ export function StepEditorDrawer({
                     </Button>
                 </footer>
             </aside>
-        </>
+        </div>
     )
 }

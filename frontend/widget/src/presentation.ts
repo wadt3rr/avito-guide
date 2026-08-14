@@ -10,22 +10,40 @@ export interface UiElements {
 
 export interface ScenarioPresentation {
   readonly type: ScenarioType;
+  readonly focusMode?: 'initial' | 'none' | 'trap';
   configure(elements: UiElements): void;
   position(elements: UiElements, target: HTMLElement | null): void;
 }
 
-function configureShell(elements: UiElements, type: ScenarioType, blocking: boolean): void {
+function configureShell(
+  elements: UiElements,
+  type: ScenarioType,
+  blocking: boolean,
+  focusMode: ScenarioPresentation['focusMode'],
+): void {
   elements.host.dataset.type = type;
   elements.catcher.className = `catch catch--${type}`;
   elements.catcher.style.pointerEvents = blocking ? 'auto' : 'none';
   elements.tip.className = `tip tip--${type}`;
+  elements.tip.removeAttribute('aria-modal');
+  elements.tip.removeAttribute('aria-labelledby');
+
+  if (type === 'banner') {
+    elements.tip.setAttribute('role', 'region');
+  } else {
+    elements.tip.setAttribute('role', 'dialog');
+  }
+  elements.tip.removeAttribute('tabindex');
+
+  if (focusMode === 'trap') elements.tip.setAttribute('aria-modal', 'true');
 }
 
 export function createTooltipPresentation(): ScenarioPresentation {
   return {
     type: 'tooltip',
+    focusMode: 'initial',
     configure(elements) {
-      configureShell(elements, 'tooltip', true);
+      configureShell(elements, 'tooltip', true, 'initial');
       elements.spot.hidden = false;
     },
     position(elements, target) {
@@ -62,8 +80,9 @@ export function createStandalonePresentation(
 ): ScenarioPresentation {
   return {
     type,
+    focusMode: type === 'modal' ? 'trap' : 'none',
     configure(elements) {
-      configureShell(elements, type, blocking);
+      configureShell(elements, type, blocking, type === 'modal' ? 'trap' : 'none');
       elements.spot.hidden = true;
     },
     position() {

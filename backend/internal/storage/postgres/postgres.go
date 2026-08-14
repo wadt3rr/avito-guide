@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -64,7 +65,11 @@ func runMigrations(migrationsPath, dsn string) error {
 
 	log.Printf("Running migrations from: %s", migrationsPath)
 
-	sourceURL := "file://" + migrationsPath
+	absolutePath, err := filepath.Abs(migrationsPath)
+	if err != nil {
+		return fmt.Errorf("resolve migrations path: %w", err)
+	}
+	sourceURL := "file://" + filepath.ToSlash(absolutePath)
 
 	m, err := migrate.New(sourceURL, dsn)
 	if err != nil {
@@ -161,9 +166,9 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: couldn't get scenarios: %w", op, err)
 	}
-	defer rows.Close()
-
 	scenarios := make([]models.Scenario, 0)
+	scenarioIndexes := make(map[uuid.UUID]int)
+	scenarioIDs := make([]uuid.UUID, 0)
 
 	for rows.Next() {
 		var sc models.Scenario
@@ -183,16 +188,63 @@ func (s *Storage) GetScenarios(ctx context.Context) ([]models.Scenario, error) {
 			&sc.UpdatedAt,
 		)
 		if err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("%s: scannig error: %w", op, err)
 		}
 		if err = json.Unmarshal(rawMatch, &sc.MatchContext); err != nil {
+			rows.Close()
 			return nil, fmt.Errorf("%s: unmarshal match_context: %w", op, err)
 		}
+		sc.Steps = make([]models.Step, 0)
+		scenarioIndexes[sc.ID] = len(scenarios)
+		scenarioIDs = append(scenarioIDs, sc.ID)
 		scenarios = append(scenarios, sc)
 	}
 
 	if err = rows.Err(); err != nil {
+		rows.Close()
 		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	rows.Close()
+
+	if len(scenarioIDs) > 0 {
+		stepRows, stepErr := s.pool.Query(ctx, `
+			SELECT id, scenario_id, step_order, title, description,
+			       content, selector, action_type, condition, timeout
+			FROM steps
+			WHERE scenario_id = ANY($1)
+			ORDER BY scenario_id, step_order
+		`, scenarioIDs)
+		if stepErr != nil {
+			return nil, fmt.Errorf("%s: query steps: %w", op, stepErr)
+		}
+
+		for stepRows.Next() {
+			var step models.Step
+			if err = stepRows.Scan(
+				&step.ID,
+				&step.ScenarioID,
+				&step.StepOrder,
+				&step.Title,
+				&step.Description,
+				&step.Content,
+				&step.Selector,
+				&step.ActionType,
+				&step.Condition,
+				&step.TimeoutSec,
+			); err != nil {
+				stepRows.Close()
+				return nil, fmt.Errorf("%s: scan step: %w", op, err)
+			}
+			if index, ok := scenarioIndexes[step.ScenarioID]; ok {
+				scenarios[index].Steps = append(scenarios[index].Steps, step)
+			}
+		}
+		if err = stepRows.Err(); err != nil {
+			stepRows.Close()
+			return nil, fmt.Errorf("%s: steps rows: %w", op, err)
+		}
+		stepRows.Close()
 	}
 
 	return scenarios, nil

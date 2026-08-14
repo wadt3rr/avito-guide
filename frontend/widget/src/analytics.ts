@@ -1,6 +1,8 @@
 import type {BackendAnalyticsEvent, BackendEventType, EventType, WidgetConfig} from './types';
 
 const FLUSH_INTERVAL_MS = 3000;
+const MAX_RETRY_INTERVAL_MS = 30_000;
+const MAX_QUEUED_EVENTS = 100;
 
 export interface TrackerIdentity {
   sessionId: string;
@@ -17,6 +19,7 @@ const BACKEND_EVENT_TYPES: Partial<Record<EventType, BackendEventType>> = {
 export class Analytics {
   private queue: BackendAnalyticsEvent[] = [];
   private timer: number | undefined;
+  private retryIntervalMs = FLUSH_INTERVAL_MS;
 
   constructor(
     private readonly config: WidgetConfig,
@@ -41,6 +44,7 @@ export class Analytics {
       ...(stepId ? {step_id: stepId} : {}),
       event_type: eventType,
     });
+    if (this.queue.length > MAX_QUEUED_EVENTS) this.queue.shift();
     this.schedule();
   }
 
@@ -49,12 +53,19 @@ export class Analytics {
     window.removeEventListener('pagehide', this.flush);
   }
 
-  private schedule(): void {
+  private schedule(delayMs = FLUSH_INTERVAL_MS): void {
     if (this.timer !== undefined) return;
     this.timer = window.setTimeout(() => {
       this.timer = undefined;
       this.flush();
-    }, FLUSH_INTERVAL_MS);
+    }, delayMs);
+  }
+
+  private retry(batch: BackendAnalyticsEvent[]): void {
+    this.queue = [...batch, ...this.queue].slice(0, MAX_QUEUED_EVENTS);
+    this.schedule(this.retryIntervalMs);
+    this.retryIntervalMs = Math.min(this.retryIntervalMs * 2, MAX_RETRY_INTERVAL_MS);
+    if (this.config.debug) console.warn('[onboarding] Analytics delivery failed; retry scheduled.');
   }
 
   private flush(): void {
@@ -66,13 +77,32 @@ export class Analytics {
 
     const url = `${this.config.apiUrl}/api/v1/embed/events`;
     const body = JSON.stringify(batch);
-    if (navigator.sendBeacon?.(url, new Blob([body], {type: 'text/plain;charset=UTF-8'}))) return;
+    if (navigator.sendBeacon?.(url, new Blob([body], {type: 'text/plain;charset=UTF-8'}))) {
+      this.retryIntervalMs = FLUSH_INTERVAL_MS;
+      return;
+    }
 
     void fetch(url, {
       method: 'POST',
       headers: {'Content-Type': 'text/plain;charset=UTF-8'},
       body,
       keepalive: true,
-    }).catch(() => undefined);
+    }).then(
+      (response) => {
+        if (response.ok) {
+          this.retryIntervalMs = FLUSH_INTERVAL_MS;
+          return;
+        }
+        if (response.status === 408 || response.status === 429 || response.status >= 500) {
+          this.retry(batch);
+          return;
+        }
+        this.retryIntervalMs = FLUSH_INTERVAL_MS;
+        if (this.config.debug) {
+          console.warn(`[onboarding] Analytics delivery rejected with status ${response.status}.`);
+        }
+      },
+      () => this.retry(batch),
+    );
   }
 }

@@ -42,9 +42,9 @@ function draft(overrides: Partial<IScenario> = {}): IScenario {
 }
 
 describe('scenario type draft rules', () => {
-  it('keeps old and unknown API values compatible with tooltip scenarios', () => {
-    expect(normalizeScenarioType(undefined)).toBe('tooltip')
-    expect(normalizeScenarioType('carousel')).toBe('tooltip')
+  it('rejects missing and unknown scenario types', () => {
+    expect(() => normalizeScenarioType(undefined)).toThrow('Unsupported scenario type')
+    expect(() => normalizeScenarioType('carousel')).toThrow('Unsupported scenario type')
     expect(normalizeScenarioType('modal')).toBe('modal')
   })
 
@@ -142,7 +142,7 @@ describe('scenario validation', () => {
         ...draft().steps[0]!,
         text: 'C'.repeat(MAX_STEP_CONTENT_LENGTH + 1),
       }],
-    }), 'save')).toBe('Текст шага 1 не должен превышать 50 символов.')
+    }), 'save')).toBe('Текст шага 1 не должен превышать 300 символов.')
   })
 
   it('allows an incomplete draft but blocks publishing it', () => {

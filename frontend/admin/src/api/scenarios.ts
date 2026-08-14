@@ -95,11 +95,7 @@ interface IApiScenarioAnalytics {
 
 export type ScenarioPublicationAction = 'publish' | 'unpublish'
 
-const apiOrigin = (import.meta.env.VITE_API_URL ?? 'http://localhost:8081').replace(
-    /\/$/,
-    '',
-)
-const scenariosUrl = `${apiOrigin}/api/v1/scenarios`
+const scenariosUrl = '/api/v1/scenarios'
 const apiTimeoutMs = 10_000
 const uuidPattern =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -231,11 +227,7 @@ function scenarioToPayload(scenario: IScenario): IApiScenarioPayload {
 
 export async function getScenarios(): Promise<IScenario[]> {
     const scenarios = await request<IApiScenario[]>(scenariosUrl)
-    const detailedScenarios = await Promise.all(
-        scenarios.map((scenario) => getScenarioById(scenario.id)),
-    )
-
-    return detailedScenarios
+    return scenarios.map(apiScenarioToScenario)
 }
 
 export async function getScenarioById(id: string): Promise<IScenario> {

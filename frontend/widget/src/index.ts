@@ -21,8 +21,9 @@ declare global {
 function readConfig(): WidgetConfig {
   const script = document.currentScript as HTMLScriptElement | null;
   const params = new URLSearchParams(location.search);
+  const apiUrl = script?.dataset.api?.replace(/\/$/, '') || null;
   return {
-    apiUrl: script?.dataset.api?.replace(/\/$/, '') || null,
+    apiUrl,
     previewId: params.get('onboarding_preview'),
     debug: script?.dataset.debug === 'true' || params.has('onboarding_debug'),
   };

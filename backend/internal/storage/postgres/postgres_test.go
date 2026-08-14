@@ -68,6 +68,9 @@ func dsnToURL(t *testing.T, cfg *pgx.ConnConfig) string {
 	for key, value := range cfg.RuntimeParams {
 		query.Set(key, value)
 	}
+	if cfg.TLSConfig == nil {
+		query.Set("sslmode", "disable")
+	}
 
 	if cfg.Port != 0 && !strings.Contains(u.Host, ":") {
 		u.Host = fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
@@ -196,6 +199,15 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 			}
 
 			defer store.Close()
+			userID, err := store.CreateUser(ctx, &models.User{
+				Email:        "scenario-owner@example.com",
+				PasswordHash: "test-hash",
+				Role:         models.UserRoleAdmin,
+			})
+			if err != nil {
+				t.Fatalf("CreateUser failed: %v", err)
+			}
+			tt.scenario.UserID = userID
 
 			id, err := store.CreateScenario(ctx, &tt.scenario)
 			if err != nil {
@@ -220,6 +232,9 @@ func TestStorage_CreateAndGetScenario(t *testing.T) {
 			}
 			if scenarios[0].Type != models.ScenarioBanner {
 				t.Fatalf("expected banner type, got %q", scenarios[0].Type)
+			}
+			if len(scenarios[0].Steps) != tt.wantStepCount {
+				t.Fatalf("expected list response to contain %d steps, got %d", tt.wantStepCount, len(scenarios[0].Steps))
 			}
 
 			retrieved, err := store.GetScenarioByID(ctx, id)

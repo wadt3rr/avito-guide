@@ -1,8 +1,9 @@
-import {useEffect, useState, type FormEvent} from 'react'
+import {useRef, useState, type FormEvent} from 'react'
 import {ApiError} from '../../api/client'
 import {createAdmin} from '../../api/users'
 import {Button} from '../../components/Button/Button'
 import {Icon} from '../../components/Icon/Icon'
+import {useModalFocus} from '../../hooks/useModalFocus'
 
 interface UserCreateModalProps {
   open: boolean
@@ -15,19 +16,9 @@ export function UserCreateModal({open, onClose, onCreated}: UserCreateModalProps
   const [password, setPassword] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!open) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !pending) onClose()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, open, pending])
-
-  if (!open) return null
+  const dialogRef = useRef<HTMLElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
+  const modalRootRef = useRef<HTMLDivElement>(null)
 
   const closeModal = () => {
     if (pending) return
@@ -36,6 +27,17 @@ export function UserCreateModal({open, onClose, onCreated}: UserCreateModalProps
     setError('')
     onClose()
   }
+
+  useModalFocus({
+    active: open,
+    closeDisabled: pending,
+    containerRef: dialogRef,
+    initialFocusRef: emailRef,
+    modalRootRef,
+    onClose: closeModal,
+  })
+
+  if (!open) return null
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -59,11 +61,12 @@ export function UserCreateModal({open, onClose, onCreated}: UserCreateModalProps
   }
 
   return (
-    <div className="users-modal" role="presentation">
+    <div className="users-modal" ref={modalRootRef} role="presentation">
       <section
         aria-labelledby="create-admin-title"
         aria-modal="true"
         className="users-modal__dialog"
+        ref={dialogRef}
         role="dialog"
       >
         <div className="users-modal__header">
@@ -87,8 +90,8 @@ export function UserCreateModal({open, onClose, onCreated}: UserCreateModalProps
             <span>Email</span>
             <input
               autoComplete="off"
-              autoFocus
               onChange={(event) => setEmail(event.target.value)}
+              ref={emailRef}
               required
               type="email"
               value={email}

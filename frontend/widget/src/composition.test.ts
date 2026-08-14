@@ -9,7 +9,6 @@ describe('default widget composition', () => {
     expect(registry.resolve('tooltip').flow).toBe(tooltipFlow);
     expect(registry.resolve('modal').flow).toBe(standaloneFlow);
     expect(registry.resolve('banner').flow).toBe(standaloneFlow);
-    expect(registry.resolve('carousel').type).toBe('tooltip');
   });
 
   it('provides the message renderer for legacy steps', () => {

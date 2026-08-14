@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
+import {getWidgetPreviewUrl} from '../../config/runtime'
 import {buildPreviewScenario} from '../../data/scenarioTypes'
 import type {IScenario} from '../../data/scenarios'
 import './WidgetPreview.scss'
@@ -7,13 +8,13 @@ interface IWidgetPreview {
   scenario: IScenario
 }
 
-const widgetUrl = import.meta.env.VITE_WIDGET_URL ?? 'http://localhost:8082/widget.js'
+const widgetUrl = getWidgetPreviewUrl()
 
 function safeInlineJson(value: string) {
   return JSON.stringify(value).replaceAll('<', '\\u003c')
 }
 
-function createFrameHtml() {
+function createFrameHtml(scriptUrl: string) {
   return `<!doctype html>
 <html lang="ru">
 <head>
@@ -44,7 +45,7 @@ function createFrameHtml() {
       window.AvitoOnboarding?.preview(event.data.scenario);
     });
     const script=document.createElement('script');
-    script.src=${safeInlineJson(widgetUrl)};
+    script.src=${safeInlineJson(scriptUrl)};
     script.onload=()=>parent.postMessage({type:window.AvitoOnboarding?.preview?'avito-widget-preview-ready':'avito-widget-preview-error'},parentOrigin);
     script.onerror=()=>parent.postMessage({type:'avito-widget-preview-error'},parentOrigin);
     document.head.append(script);
@@ -53,11 +54,13 @@ function createFrameHtml() {
 </html>`
 }
 
-const frameHtml = createFrameHtml()
+const frameHtml = widgetUrl ? createFrameHtml(widgetUrl) : ''
 
 export function WidgetPreview({scenario}: IWidgetPreview) {
   const frameRef = useRef<HTMLIFrameElement>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(
+    widgetUrl ? 'loading' : 'error',
+  )
   const previewScenario = useMemo(() => buildPreviewScenario(scenario), [scenario])
 
   useEffect(() => {
@@ -93,12 +96,14 @@ export function WidgetPreview({scenario}: IWidgetPreview) {
         <p id="widget-preview-title">Так виджет будет выглядеть на странице</p>
       </div>
       <div className="widget-preview__viewport">
-        <iframe
-          ref={frameRef}
-          sandbox="allow-same-origin allow-scripts"
-          srcDoc={frameHtml}
-          title="Предпросмотр виджета"
-        />
+        {widgetUrl && (
+          <iframe
+            ref={frameRef}
+            sandbox="allow-same-origin allow-scripts"
+            srcDoc={frameHtml}
+            title="Предпросмотр виджета"
+          />
+        )}
         {status === 'loading' && (
           <span className="widget-preview__state" role="status">Загружаем виджет…</span>
         )}
