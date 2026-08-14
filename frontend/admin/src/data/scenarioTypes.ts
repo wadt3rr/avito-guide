@@ -3,7 +3,7 @@ import {createEmptyStep, type IScenario, type IScenarioStep, type ScenarioType} 
 export const MAX_SCENARIO_TITLE_LENGTH = 100
 export const MAX_SCENARIO_DESCRIPTION_LENGTH = 250
 export const MAX_STEP_TITLE_LENGTH = 100
-export const MAX_STEP_CONTENT_LENGTH = 50
+export const MAX_STEP_CONTENT_LENGTH = 300
 
 export const SCENARIO_TITLE_PLACEHOLDER = 'Название сценария'
 
@@ -42,9 +42,8 @@ export interface IWidgetPreviewScenario {
 }
 
 export function normalizeScenarioType(value: unknown): ScenarioType {
-  return value === 'modal' || value === 'banner' || value === 'tooltip'
-    ? value
-    : 'tooltip'
+  if (value === 'modal' || value === 'banner' || value === 'tooltip') return value
+  throw new Error(`Unsupported scenario type: ${String(value)}`)
 }
 
 function toStandaloneStep(step: IScenarioStep): IScenarioStep {
@@ -117,7 +116,7 @@ export function validateScenario(
       return `Название шага ${stepNumber} не должно превышать 100 символов.`
     }
     if (step.text.length > MAX_STEP_CONTENT_LENGTH) {
-      return `Текст шага ${stepNumber} не должен превышать 50 символов.`
+      return `Текст шага ${stepNumber} не должен превышать 300 символов.`
     }
 
     const timeout = Number(step.timeout)

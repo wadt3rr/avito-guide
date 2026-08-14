@@ -1,7 +1,8 @@
-import {useEffect, useState} from 'react'
+import {useRef, useState} from 'react'
 import {deleteUser, type AdminUser} from '../../api/users'
 import {Button} from '../../components/Button/Button'
 import {Icon} from '../../components/Icon/Icon'
+import {useModalFocus} from '../../hooks/useModalFocus'
 
 interface UserDeleteModalProps {
   user: AdminUser | null
@@ -12,25 +13,26 @@ interface UserDeleteModalProps {
 export function UserDeleteModal({user, onClose, onDeleted}: UserDeleteModalProps) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!user) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !pending) onClose()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, pending, user])
-
-  if (!user) return null
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLElement>(null)
+  const modalRootRef = useRef<HTMLDivElement>(null)
 
   const closeModal = () => {
     if (pending) return
     setError('')
     onClose()
   }
+
+  useModalFocus({
+    active: Boolean(user),
+    closeDisabled: pending,
+    containerRef: dialogRef,
+    initialFocusRef: closeButtonRef,
+    modalRootRef,
+    onClose: closeModal,
+  })
+
+  if (!user) return null
 
   const handleDelete = async () => {
     setPending(true)
@@ -49,11 +51,12 @@ export function UserDeleteModal({user, onClose, onDeleted}: UserDeleteModalProps
   }
 
   return (
-    <div className="users-modal" role="presentation">
+    <div className="users-modal" ref={modalRootRef} role="presentation">
       <section
         aria-labelledby="delete-user-title"
         aria-modal="true"
         className="users-modal__dialog users-modal__dialog--delete"
+        ref={dialogRef}
         role="dialog"
       >
         <div className="users-modal__header">
@@ -66,6 +69,7 @@ export function UserDeleteModal({user, onClose, onDeleted}: UserDeleteModalProps
             className="users-modal__close"
             disabled={pending}
             onClick={closeModal}
+            ref={closeButtonRef}
             type="button"
           >
             <Icon name="close" size={20}/>

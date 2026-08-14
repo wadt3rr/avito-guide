@@ -10,7 +10,6 @@ export interface ScenarioDefinition {
 
 export class ScenarioDefinitionRegistry {
   private readonly definitions = new Map<ScenarioType, ScenarioDefinition>();
-  private readonly fallback: ScenarioDefinition;
 
   constructor(definitions: readonly ScenarioDefinition[]) {
     for (const definition of definitions) {
@@ -20,14 +19,11 @@ export class ScenarioDefinitionRegistry {
       this.definitions.set(definition.type, definition);
     }
 
-    const fallback = this.definitions.get('tooltip');
-    if (!fallback) throw new Error('Tooltip scenario definition is required');
-    this.fallback = fallback;
   }
 
-  resolve(type: unknown): ScenarioDefinition {
-    return typeof type === 'string'
-      ? (this.definitions.get(type as ScenarioType) ?? this.fallback)
-      : this.fallback;
+  resolve(type: ScenarioType): ScenarioDefinition {
+    const definition = this.definitions.get(type);
+    if (!definition) throw new Error(`Unknown scenario definition: ${type}`);
+    return definition;
   }
 }

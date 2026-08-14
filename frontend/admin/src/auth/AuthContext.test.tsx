@@ -62,7 +62,7 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem('avito-admin:auth')).toBeNull()
   })
 
-  it('keeps the stored token when auth/me fails with a transient server error', async () => {
+  it('clears the stored session when auth/me fails with a transient server error', async () => {
     const savedSession = {
       token: 'jwt-token',
       user: {id: 'user-id', email: 'admin@example.com', role: 'admin' as const},
@@ -73,7 +73,7 @@ describe('AuthProvider', () => {
     render(<AuthProvider><AuthProbe/></AuthProvider>)
 
     await waitFor(() => expect(screen.getByText('anonymous:guest')).toBeTruthy())
-    expect(JSON.parse(localStorage.getItem('avito-admin:auth') ?? '{}')).toEqual(savedSession)
+    expect(localStorage.getItem('avito-admin:auth')).toBeNull()
   })
 
   it('does not let a late auth/me response overwrite a newer login', async () => {

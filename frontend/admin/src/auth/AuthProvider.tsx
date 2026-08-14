@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import {authenticate, getCurrentUser} from '../api/auth'
-import {ApiError, AUTH_UNAUTHORIZED_EVENT} from '../api/client'
+import {AUTH_UNAUTHORIZED_EVENT} from '../api/client'
 import {AuthContext, type AuthContextValue, type AuthStatus} from './auth-context'
 import {
   clearSession,
@@ -46,15 +46,10 @@ export function AuthProvider({children}: {children: ReactNode}) {
           setSession(validated)
           setStatus('authenticated')
         })
-        .catch((error: unknown) => {
+        .catch(() => {
           if (authOperationRef.current !== operation
             || readSession()?.token !== validatedToken) return
-          if (error instanceof ApiError && error.status === 401) {
-            logout()
-            return
-          }
-          setSession(null)
-          setStatus('anonymous')
+          logout()
         })
     }
 

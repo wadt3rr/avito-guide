@@ -59,7 +59,21 @@ export const STYLES = `
   top: 50%;
   left: 50%;
   width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
   transform: translate(-50%, -50%);
+}
+
+.tip--modal .tip__head,
+.tip--modal .tip__foot {
+  flex: 0 0 auto;
+}
+
+.tip--modal .tip__body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .tip--banner {

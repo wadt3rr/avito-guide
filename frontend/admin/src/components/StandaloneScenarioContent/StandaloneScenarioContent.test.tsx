@@ -30,7 +30,7 @@ describe('StandaloneScenarioContent', () => {
     })
     expect(screen.queryByText(/целевой элемент/i)).toBeNull()
     expect(screen.getByLabelText('Заголовок баннера').getAttribute('maxlength')).toBe('100')
-    expect(screen.getByLabelText('Текст сообщения').getAttribute('maxlength')).toBe('50')
+    expect(screen.getByLabelText('Текст сообщения').getAttribute('maxlength')).toBe('300')
   })
 
   it.each([

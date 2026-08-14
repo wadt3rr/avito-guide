@@ -1,8 +1,7 @@
 import {clearSession, readSession} from '../auth/session'
+import {getApiOrigin} from '../config/runtime'
 
 export const AUTH_UNAUTHORIZED_EVENT = 'avito-auth:unauthorized'
-
-const apiOrigin = (import.meta.env.VITE_API_URL ?? 'http://localhost:8081').replace(/\/$/, '')
 
 export class ApiError extends Error {
   status: number
@@ -20,7 +19,7 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   const requestToken = explicitAuthorization?.startsWith('Bearer ')
     ? explicitAuthorization.slice('Bearer '.length)
     : session?.token
-  const response = await fetch(path.startsWith('http') ? path : `${apiOrigin}${path}`, {
+  const response = await fetch(path.startsWith('http') ? path : `${getApiOrigin()}${path}`, {
     ...init,
     headers: {
       Accept: 'application/json',

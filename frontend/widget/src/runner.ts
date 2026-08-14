@@ -44,14 +44,6 @@ export class Runner {
     if (saved?.finished) return;
 
     this.index = this.definition.flow.initialIndex(saved?.step, this.scenario.steps.length);
-
-    this.ui = new Ui({
-      onNext: () => void this.advance('step_completed'),
-      onBack: () => void this.back(),
-      onSkip: () => void this.advance('step_skipped'),
-      onDismiss: () => this.dismiss(),
-    }, this.definition.presentation, this.content);
-    document.addEventListener('keydown', this.onKeyDown);
     this.track('scenario_started', null, {resumed_at_step: this.index});
     await this.enter(this.index);
   }
@@ -96,6 +88,15 @@ export class Runner {
   }
 
   private show(step: Step, target?: HTMLElement): void {
+    if (!this.ui) {
+      this.ui = new Ui({
+        onNext: () => void this.advance('step_completed'),
+        onBack: () => void this.back(),
+        onSkip: () => void this.advance('step_skipped'),
+        onDismiss: () => this.dismiss(),
+      }, this.definition.presentation, this.content);
+      document.addEventListener('keydown', this.onKeyDown);
+    }
     this.state = 'showing';
     this.saveProgress(this.index);
     this.track('step_shown', step.id);

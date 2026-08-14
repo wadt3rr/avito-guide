@@ -4,13 +4,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Analytics } from './analytics';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('backend analytics contract', () => {
-  it('posts one backend-compatible event to the existing analytics endpoint', () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
+  it('retries a backend-compatible event after a transient delivery failure', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('network unavailable'))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
     Object.defineProperty(navigator, 'sendBeacon', {
       configurable: true,
@@ -22,10 +26,11 @@ describe('backend analytics contract', () => {
       { sessionId: 'session-test' },
     );
     analytics.track('scenario_started', 'scenario-id', null);
-    analytics.destroy();
+    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(3000);
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith('http://localhost:8081/api/v1/embed/events', {
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenLastCalledWith('http://localhost:8081/api/v1/embed/events', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify([{
@@ -35,6 +40,7 @@ describe('backend analytics contract', () => {
       }]),
       keepalive: true,
     });
+    analytics.destroy();
   });
 
   it('maps supported events and drops widget-only diagnostics', () => {
